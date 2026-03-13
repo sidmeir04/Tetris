@@ -190,8 +190,10 @@ int main() {
     bool held = false;
 
     float timeSinceLastDrop = 0;
-    bool grounded = false;
     float timeOnGround = 0;
+
+    float DASTimer = 100;
+    float ARRTime = 10;
 
     bool showDebug = true;
 
@@ -212,21 +214,11 @@ int main() {
 
             if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
                 if (keyPressed->code == sf::Keyboard::Key::L) {
-                    currentPiece.x++;
-                    if(!board.validPosition(currentPiece)){
-                        currentPiece.x--;
-                    } else if(board.validPosition({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y - 1})){
-                        grounded = false;  // y-1 is one row down (toward bottom; y=0 at bottom)
-                    }
+                    currentPiece = board.movePiece(currentPiece, 1);
                 }
 
                 if (keyPressed->code == sf::Keyboard::Key::M) {
-                    currentPiece.x--;
-                    if(!board.validPosition(currentPiece)){
-                        currentPiece.x++;
-                    } else if(board.validPosition({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y - 1})){
-                        grounded = false;  // y-1 is one row down (toward bottom; y=0 at bottom)
-                    }
+                    currentPiece = board.movePiece(currentPiece, -1);
                 }
 
                 if (keyPressed->code == sf::Keyboard::Key::K) {
@@ -253,21 +245,17 @@ int main() {
                     }
                     currentPiece.rotation = 0;
                     currentPiece.x = 3;
-                    currentPiece.y = board.height - 1;  // spawn at top
-                    grounded = false;
+                    currentPiece.y = board.height - 1;
+                    currentPiece.grounded = false;
                     held = true;
                 }
 
                 if (keyPressed->code == sf::Keyboard::Key::V) {
                     for(;;currentPiece.y--){
                         if(!board.validPosition(currentPiece)){
-                            currentPiece.y++;  // backtrack to last valid
+                            currentPiece.y++;
                             board.placePiece({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y});
-                            currentPiece.piece = getNextPiece();
-                            currentPiece.rotation = 0;
-                            currentPiece.x = 3;
-                            currentPiece.y = board.height;
-                            grounded = false;
+                            currentPiece.reset(getNextPiece(), 0, 3, board.height, false);
                             held = false;
                             timeOnGround = 0;
                             board.clearLines();
@@ -279,8 +267,8 @@ int main() {
                 if (keyPressed->code == sf::Keyboard::Key::Slash) {
                     for(;;currentPiece.y--){
                         if(!board.validPosition(currentPiece)){
-                            currentPiece.y++;  // backtrack to last valid
-                            grounded = true;
+                            currentPiece.y++;
+                            currentPiece.grounded = true;
                             break;
                         }
                     }
@@ -302,13 +290,13 @@ int main() {
         if(timeSinceLastDrop > 30){
             currentPiece.y--;
             if(!board.validPosition(currentPiece)){
-                grounded = true;
+                currentPiece.grounded = true;
                 currentPiece.y++;
             }
             timeSinceLastDrop = 0;
         }
 
-        if(grounded){
+        if(currentPiece.grounded){
             timeOnGround += 60/fps;
             if(timeOnGround >= 100){
                 board.placePiece(currentPiece);
@@ -316,7 +304,7 @@ int main() {
                 currentPiece.rotation = 0;
                 currentPiece.x = 3;
                 currentPiece.y = board.height;
-                grounded = false;
+                currentPiece.grounded = false;
                 held = false;
                 timeOnGround = 0;
                 board.clearLines();

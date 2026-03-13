@@ -82,6 +82,16 @@ struct Board {
         }
     }
 
+    PieceState movePiece(PieceState currentPiece, int movement){
+        currentPiece.x += movement;
+        if(!validPosition(currentPiece)){
+            currentPiece.x -= movement;
+        } else if(validPosition({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y - 1})){
+            currentPiece.grounded = false;
+        }
+        return currentPiece;
+    }
+
     PieceState rotatePiece(PieceState currentPiece, int rotation){
         PieceState rotated = currentPiece;
         rotated.rotation = (rotated.rotation + rotation + 4) % 4;
