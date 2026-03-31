@@ -6,6 +6,7 @@
 #include "board.h"
 #include "pieces.h"
 #include "pieceState.h"
+#include "pieceHandling.h"
 
 void debug(sf::RenderWindow& window, std::string status){
     const sf::Font font("assets/font/times.ttf");
@@ -188,14 +189,18 @@ int main() {
 
     int holdPiece = -1;
     bool held = false;
+    bool downPressed = false;
 
     float timeSinceLastDrop = 0;
     float timeOnGround = 0;
 
-    float DASTimer = 100;
-    float ARRTime = 10;
-
     bool showDebug = true;
+
+    const std::chrono::milliseconds DAS_DELAY(100); 
+    const std::chrono::milliseconds ARR_INTERVAL(0);
+
+    InputState moveLeftState(DAS_DELAY,ARR_INTERVAL,-1);
+    InputState moveRightState(DAS_DELAY,ARR_INTERVAL,1);
 
     sf::Clock fpsClock;
 
@@ -213,12 +218,24 @@ int main() {
             }
 
             if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                auto now = std::chrono::high_resolution_clock::now();
                 if (keyPressed->code == sf::Keyboard::Key::L) {
-                    currentPiece = board.movePiece(currentPiece, 1);
+                    if (!moveRightState.isPressed) {
+                        moveRightState.isPressed = true;
+                        moveRightState.startTime = now;
+                        moveRightState.dasTriggered = false;
+                        moveLeftState.reset();
+                        currentPiece = board.movePiece(currentPiece, 1);
+                    }
                 }
-
                 if (keyPressed->code == sf::Keyboard::Key::M) {
-                    currentPiece = board.movePiece(currentPiece, -1);
+                    if (!moveLeftState.isPressed) {
+                        moveLeftState.isPressed = true;
+                        moveLeftState.startTime = now;
+                        moveLeftState.dasTriggered = false;
+                        moveRightState.reset();
+                        currentPiece = board.movePiece(currentPiece, -1);
+                    }
                 }
 
                 if (keyPressed->code == sf::Keyboard::Key::K) {
@@ -243,10 +260,9 @@ int main() {
                         holdPiece = currentPiece.piece;
                         currentPiece.piece = getNextPiece();
                     }
-                    currentPiece.rotation = 0;
-                    currentPiece.x = 3;
-                    currentPiece.y = board.height - 1;
-                    currentPiece.grounded = false;
+                    currentPiece.reset(currentPiece.piece, 0, 3, board.height + 2);
+                    timeOnGround = 0;
+                    timeSinceLastDrop = 0;
                     held = true;
                 }
 
@@ -255,9 +271,10 @@ int main() {
                         if(!board.validPosition(currentPiece)){
                             currentPiece.y++;
                             board.placePiece({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y});
-                            currentPiece.reset(getNextPiece(), 0, 3, board.height, false);
+                            currentPiece.reset(getNextPiece(), 0, 3, board.height+2, false);
                             held = false;
                             timeOnGround = 0;
+                            timeSinceLastDrop = 0;
                             board.clearLines();
                             break;
                         }
@@ -265,13 +282,7 @@ int main() {
                 }
 
                 if (keyPressed->code == sf::Keyboard::Key::Slash) {
-                    for(;;currentPiece.y--){
-                        if(!board.validPosition(currentPiece)){
-                            currentPiece.y++;
-                            currentPiece.grounded = true;
-                            break;
-                        }
-                    }
+                    downPressed = true;
                 }
 
                 if (keyPressed->code == sf::Keyboard::Key::F8) {
@@ -282,9 +293,27 @@ int main() {
                     window.close();
                 }
             }
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyReleased>()) {
+                if (keyPressed->code == sf::Keyboard::Key::L) moveRightState.isPressed = false;
+                if (keyPressed->code == sf::Keyboard::Key::M) moveLeftState.isPressed = false;
+                if (keyPressed->code == sf::Keyboard::Key::Slash) downPressed = false;
+            }
         }
 
+        currentPiece = board.updatePiecePosition(currentPiece, &moveRightState);
+        currentPiece = board.updatePiecePosition(currentPiece, &moveLeftState);
+
         window.clear(sf::Color(30, 30, 30));
+
+        if(downPressed){
+            for(;;currentPiece.y--){
+                if(!board.validPosition(currentPiece)){
+                    currentPiece.y++;
+                    currentPiece.grounded = true;
+                    break;
+                }
+            }
+        }
 
         timeSinceLastDrop += 60/fps;
         if(timeSinceLastDrop > 30){
@@ -303,10 +332,11 @@ int main() {
                 currentPiece.piece = getNextPiece();
                 currentPiece.rotation = 0;
                 currentPiece.x = 3;
-                currentPiece.y = board.height;
+                currentPiece.y = board.height+2;
                 currentPiece.grounded = false;
                 held = false;
                 timeOnGround = 0;
+                timeSinceLastDrop = 0;
                 board.clearLines();
             }
         }

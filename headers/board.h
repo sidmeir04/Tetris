@@ -2,6 +2,7 @@
 #include "pieces.h"
 #include "pieceState.h"
 #include "srsTable.h"
+#include "pieceHandling.h"
 
 struct Board {
     int width;
@@ -83,28 +84,52 @@ struct Board {
     }
 
     PieceState movePiece(PieceState currentPiece, int movement){
-        currentPiece.x += movement;
-        if(!validPosition(currentPiece)){
-            currentPiece.x -= movement;
-        } else if(validPosition({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y - 1})){
-            currentPiece.grounded = false;
+        int sign = (movement > 0) - (movement < 0);
+        for(int i = 0; i < sign*movement; i ++){
+            currentPiece.x += sign;
+            if(!validPosition(currentPiece)){
+                currentPiece.x -= sign;
+                return currentPiece;
+            } else if(validPosition({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y - 1})){
+                currentPiece.grounded = false;
+            }
         }
+        return currentPiece;
+    }
+
+    PieceState updatePiecePosition(PieceState currentPiece, InputState* input){
+        const std::chrono::milliseconds ZERO(0);
+        if (input->isPressed) {
+            auto elapsed = std::chrono::high_resolution_clock::now() - input->startTime;
+            
+            if (elapsed >= input->DAS_DELAY) {
+                input->dasTriggered = true;
+                if(input->ARR_INTERVAL == ZERO){
+                    return movePiece(currentPiece, input->movement*100);
+                    input->lastRepeat = std::chrono::high_resolution_clock::now();
+                }
+                auto timeSinceLastRepeat = std::chrono::high_resolution_clock::now() - input->lastRepeat;
+                if (timeSinceLastRepeat >= input->ARR_INTERVAL) {
+                    return movePiece(currentPiece, input->movement);
+                    input->lastRepeat = std::chrono::high_resolution_clock::now();
+                }
+            }
+        } else {
+            input->dasTriggered = false;
+        }
+        
         return currentPiece;
     }
 
     PieceState rotatePiece(PieceState currentPiece, int rotation){
         PieceState rotated = currentPiece;
         rotated.rotation = (rotated.rotation + rotation + 4) % 4;
-        std::vector<std::vector<int>> kicks = getSRS(rotated);
-        if(!validPosition(rotated)){
-            for(std::vector<int> offset : kicks){
-                PieceState temp = rotated;
-                temp.x += offset[0];
-                temp.y -= offset[1];  // negate: SRS has y+ down, we have y- down (y=0 at bottom)
-                if(validPosition(temp)) return temp;
-            }
-        } else {
-            return rotated;
+        std::vector<std::vector<int>> kicks = getOffests(rotated, currentPiece.rotation);
+        for(std::vector<int> offset : kicks){
+            PieceState temp = rotated;
+            temp.x += offset[0];
+            temp.y -= offset[1];
+            if(validPosition(temp)) return temp;
         }
         return currentPiece;
     }
