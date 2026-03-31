@@ -173,7 +173,7 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board, Pie
 
 int main() {
     sf::RenderWindow window(sf::VideoMode({800, 800}), "Tetris");
-    window.setFramerateLimit(60);
+    // window.setFramerateLimit(60);
 
     sf::Texture texture;
     if (!texture.loadFromFile("assets/img/tetrisBlocks.png")) {
@@ -221,19 +221,15 @@ int main() {
                 auto now = std::chrono::high_resolution_clock::now();
                 if (keyPressed->code == sf::Keyboard::Key::L) {
                     if (!moveRightState.isPressed) {
-                        moveRightState.isPressed = true;
-                        moveRightState.startTime = now;
-                        moveRightState.dasTriggered = false;
-                        moveLeftState.reset();
+                        moveRightState.press(now);
+                        moveLeftState.release();
                         currentPiece = board.movePiece(currentPiece, 1);
                     }
                 }
                 if (keyPressed->code == sf::Keyboard::Key::M) {
                     if (!moveLeftState.isPressed) {
-                        moveLeftState.isPressed = true;
-                        moveLeftState.startTime = now;
-                        moveLeftState.dasTriggered = false;
-                        moveRightState.reset();
+                        moveLeftState.press(now);
+                        moveRightState.release();
                         currentPiece = board.movePiece(currentPiece, -1);
                     }
                 }
@@ -294,8 +290,8 @@ int main() {
                 }
             }
             if (const auto* keyPressed = event->getIf<sf::Event::KeyReleased>()) {
-                if (keyPressed->code == sf::Keyboard::Key::L) moveRightState.isPressed = false;
-                if (keyPressed->code == sf::Keyboard::Key::M) moveLeftState.isPressed = false;
+                if (keyPressed->code == sf::Keyboard::Key::L) moveRightState.release();
+                if (keyPressed->code == sf::Keyboard::Key::M) moveLeftState.release();
                 if (keyPressed->code == sf::Keyboard::Key::Slash) downPressed = false;
             }
         }

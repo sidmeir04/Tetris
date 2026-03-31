@@ -15,7 +15,14 @@ struct InputState {
     InputState(std::chrono::milliseconds das, std::chrono::milliseconds arr, int move)
         : DAS_DELAY(das), ARR_INTERVAL(arr), movement(move) {}
 
-    void reset(bool press = false, bool das = false){
+    void press(const std::chrono::time_point<std::chrono::high_resolution_clock>& now){
+        isPressed = true;
+        dasTriggered = false;
+        startTime = now;
+        lastRepeat = now;
+    }
+
+    void release(){
         isPressed = false;
         dasTriggered = false;
     }
