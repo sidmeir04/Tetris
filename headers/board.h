@@ -11,7 +11,13 @@ struct Board {
 
     Board(int w, int h) : width(w), height(h), grid(h+5, std::vector<int>(w, 0)) {}
 
-    
+    void reset(int w, int h){
+        width = w;
+        height = h;
+        grid.clear();
+        grid.assign(h+5, std::vector<int>(w, 0));
+    }
+
     bool validPosition(const PieceState& state){
         std::vector<std::vector<int>> piece = getPiece(state);
         int x;
@@ -97,21 +103,21 @@ struct Board {
         return currentPiece;
     }
 
-    PieceState updatePiecePosition(PieceState currentPiece, InputState* input){
+    PieceState updatePiecePosition(PieceState currentPiece, InputState* input, std::chrono::time_point<std::chrono::high_resolution_clock> time){
         const std::chrono::milliseconds ZERO(0);
         if (input->isPressed) {
-            auto elapsed = std::chrono::high_resolution_clock::now() - input->startTime;
+            auto elapsed = time - input->startTime;
             
             if (elapsed >= input->DAS_DELAY) {
                 input->dasTriggered = true;
                 if(input->ARR_INTERVAL == ZERO){
                     return movePiece(currentPiece, input->movement*100);
-                    input->lastRepeat = std::chrono::high_resolution_clock::now();
+                    input->lastRepeat = time;
                 }
-                auto timeSinceLastRepeat = std::chrono::high_resolution_clock::now() - input->lastRepeat;
+                auto timeSinceLastRepeat = time - input->lastRepeat;
                 if (timeSinceLastRepeat >= input->ARR_INTERVAL) {
                     return movePiece(currentPiece, input->movement);
-                    input->lastRepeat = std::chrono::high_resolution_clock::now();
+                    input->lastRepeat = time;
                 }
             }
         } else {
