@@ -1,4 +1,8 @@
 #include <vector>
+#include <deque>
+#include <random>
+#include <algorithm>
+#include <chrono>
 #include "pieces.h"
 #include "pieceState.h"
 #include "srsTable.h"
@@ -9,13 +13,64 @@ struct Board {
     int height;
     std::vector<std::vector<int>> grid;
 
-    Board(int w, int h) : width(w), height(h), grid(h+5, std::vector<int>(w, 0)) {}
+    std::vector<int> pieceBag;
+    std::mt19937 gen;
+    std::deque<int> pieceQueue;
+    PieceState currentPiece;
+    int holdPiece = -1;
+    bool held = false;
+
+    int generateNextPiece() {
+        if (pieceBag.empty()) {
+            pieceBag = {0, 1, 2, 3, 4, 5, 6};
+            std::shuffle(pieceBag.begin(), pieceBag.end(), gen);
+        }
+
+        int nextPiece = pieceBag.back();
+        pieceBag.pop_back();
+
+        return nextPiece;
+    }
+
+    int getNextPiece() {
+        pieceQueue.push_back(generateNextPiece());
+
+        int nextPiece = pieceQueue.front();
+        pieceQueue.pop_front();
+
+        return nextPiece;
+    }
+
+    Board(int w, int h)
+        : width(w),
+          height(h),
+          grid(h + 5, std::vector<int>(w, 0)),
+          gen(static_cast<unsigned int>(
+              std::chrono::system_clock::now().time_since_epoch().count())),
+          currentPiece(0, 0, 0, 0, false) {
+        currentPiece = PieceState(getNextPiece(), 0, 3, height - 1, false);
+        for (int i = 0; i < 6; i++) {
+            pieceQueue.push_back(getNextPiece());
+        }
+    }
 
     void reset(int w, int h){
         width = w;
         height = h;
         grid.clear();
         grid.assign(h+5, std::vector<int>(w, 0));
+    }
+
+    void resetGame(int w, int h) {
+        reset(w, h);
+        pieceQueue.clear();
+        pieceBag.clear();
+        for (int i = 0; i < 6; i++) {
+            pieceQueue.push_back(getNextPiece());
+        }
+        currentPiece.reset(currentPiece.piece, 0, 3, height + 1, false);
+        currentPiece.piece = getNextPiece();
+        holdPiece = -1;
     }
 
     bool validPosition(const PieceState& state){
@@ -56,16 +111,9 @@ struct Board {
             }
 
             if (isFull) {
-                // 1. Remove the full row
                 grid.erase(grid.begin() + i);
-
-                // 2. Insert a brand new empty row at the very top (high index; y=0 is bottom)
                 grid.insert(grid.begin() + (height - 1), std::vector<int>(width, 0));
-
-                // 3. Since we just moved a new row into the current index 'i',
-                // we need to check this same index again on the next loop.
                 i++; 
-                
                 linesCleared++;
             }
         }

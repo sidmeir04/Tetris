@@ -1,8 +1,5 @@
 #include <SFML/Graphics.hpp>
 #include <optional>
-#include <algorithm>
-#include <random>
-#include <deque>
 #include <array>
 #include <chrono>
 #include <mutex>
@@ -11,7 +8,6 @@
 #include <windows.h>
 #include "board.h"
 #include "pieces.h"
-#include "pieceState.h"
 #include "pieceHandling.h"
 
 struct QueuedInputEvent {
@@ -66,39 +62,9 @@ void debug(sf::RenderWindow& window, std::string status){
     window.draw(text);
 }
 
-std::vector<int> pieceBag;
-std::mt19937 gen(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count()));
-std::deque<int> pieceQueue;
-
-int generateNextPiece() {
-    if (pieceBag.empty()) {
-        pieceBag = {0, 1, 2, 3, 4, 5, 6};
-        std::shuffle(pieceBag.begin(), pieceBag.end(), gen);
-    }
-
-    int nextPiece = pieceBag.back();
-    pieceBag.pop_back();
-
-    return nextPiece;
-}
-
-int getNextPiece() {
-    pieceQueue.push_back(generateNextPiece());
-
-    int nextPiece = pieceQueue.front();
-    pieceQueue.pop_front();
-
-    return nextPiece;
-}
-
-void resetGame(Board& board, PieceState& currentPiece, int width, int height) {
-    board.reset(width, height);
-    pieceBag.clear();
-    currentPiece.reset(currentPiece.piece, 0, 3, board.height + 1, false);
-    currentPiece.piece = getNextPiece();
-}
-
-void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board, PieceState currentPiece, int holdPiece) {
+void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board) {
+    PieceState currentPiece = board.currentPiece;
+    int holdPiece = board.holdPiece;
     const int tileSize = 32;
     int xBuffer = 180;
     int yBuffer = 80;
@@ -206,7 +172,7 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board, Pie
     //Draw the preview
     sf::Sprite previewSprite(texture);
     for (int k = 0; k < 5; k++) {
-        int pieceID = pieceQueue[k];
+        int pieceID = board.pieceQueue[k];
         auto shape = getPiece({pieceID, 0});
 
         for (int i = 0; i < 4; i++) {
@@ -237,13 +203,6 @@ int main() {
 
     Board board(10, 20);
 
-    PieceState currentPiece(getNextPiece(), 0, 3, board.height - 1);  // spawn at top; y=0 is bottom
-    for(int i = 0; i < 6; i++) {
-        pieceQueue.push_back(getNextPiece());
-    }
-
-    int holdPiece = -1;
-    bool held = false;
     bool downPressed = false;
 
     float timeSinceLastDrop = 0;
@@ -312,52 +271,52 @@ int main() {
                     if (!moveRightState.isPressed) {
                         moveRightState.press(keyPressTime);
                         moveLeftState.release();
-                        currentPiece = board.movePiece(currentPiece, 1);
+                        board.currentPiece = board.movePiece(board.currentPiece, 1);
                     }
                 }
                 if (queuedEvent.key == sf::Keyboard::Key::M) {
                     if (!moveLeftState.isPressed) {
                         moveLeftState.press(keyPressTime);
                         moveRightState.release();
-                        currentPiece = board.movePiece(currentPiece, -1);
+                        board.currentPiece = board.movePiece(board.currentPiece, -1);
                     }
                 }
 
                 if (queuedEvent.key == sf::Keyboard::Key::K) {
-                    currentPiece = board.rotatePiece(currentPiece, 1);
+                    board.currentPiece = board.rotatePiece(board.currentPiece, 1);
                 }
 
                 if (queuedEvent.key == sf::Keyboard::Key::S) {
-                    currentPiece = board.rotatePiece(currentPiece, -1);
+                    board.currentPiece = board.rotatePiece(board.currentPiece, -1);
                 }
 
                 if (queuedEvent.key == sf::Keyboard::Key::LShift) {
-                    currentPiece = board.rotatePiece(currentPiece, 2);
+                    board.currentPiece = board.rotatePiece(board.currentPiece, 2);
                 }
 
                 if (queuedEvent.key == sf::Keyboard::Key::D) {
-                    if(held) continue;
-                    if(holdPiece != -1){
-                        int temp = holdPiece;
-                        holdPiece = currentPiece.piece;
-                        currentPiece.piece = temp;
+                    if(board.held) continue;
+                    if(board.holdPiece != -1){
+                        int temp = board.holdPiece;
+                        board.holdPiece = board.currentPiece.piece;
+                        board.currentPiece.piece = temp;
                     } else {
-                        holdPiece = currentPiece.piece;
-                        currentPiece.piece = getNextPiece();
+                        board.holdPiece = board.currentPiece.piece;
+                        board.currentPiece.piece = board.getNextPiece();
                     }
-                    currentPiece.reset(currentPiece.piece, 0, 3, board.height + 1, false);
+                    board.currentPiece.reset(board.currentPiece.piece, 0, 3, board.height + 1, false);
                     timeOnGround = 0;
                     timeSinceLastDrop = 0;
-                    held = true;
+                    board.held = true;
                 }
 
                 if (queuedEvent.key == sf::Keyboard::Key::V) {
-                    for(;;currentPiece.y--){
-                        if(!board.validPosition(currentPiece)){
-                            currentPiece.y++;
-                            board.placePiece({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y});
-                            currentPiece.reset(getNextPiece(), 0, 3, board.height+1, false);
-                            held = false;
+                    for(;;board.currentPiece.y--){
+                        if(!board.validPosition(board.currentPiece)){
+                            board.currentPiece.y++;
+                            board.placePiece({board.currentPiece.piece, board.currentPiece.rotation, board.currentPiece.x, board.currentPiece.y});
+                            board.currentPiece.reset(board.getNextPiece(), 0, 3, board.height+1, false);
+                            board.held = false;
                             timeOnGround = 0;
                             timeSinceLastDrop = 0;
                             board.clearLines();
@@ -371,7 +330,10 @@ int main() {
                 }
 
                 if (queuedEvent.key == sf::Keyboard::Key::R) {
-                    resetGame(board, currentPiece, 10, 20);
+                    board.resetGame(10, 20);
+                    board.held = false;
+                    timeOnGround = 0;
+                    timeSinceLastDrop = 0;
                 }
 
                 if (queuedEvent.key == sf::Keyboard::Key::F8) {
@@ -383,27 +345,27 @@ int main() {
                 }
             } else {
                 if (queuedEvent.key == sf::Keyboard::Key::L) {
-                    board.updatePiecePosition(currentPiece, &moveRightState, keyPressTime);
+                    board.updatePiecePosition(board.currentPiece, &moveRightState, keyPressTime);
                     moveRightState.release();
                 };
                 if (queuedEvent.key == sf::Keyboard::Key::M) {
-                    board.updatePiecePosition(currentPiece, &moveLeftState, keyPressTime);
+                    board.updatePiecePosition(board.currentPiece, &moveLeftState, keyPressTime);
                     moveLeftState.release();
                 };
                 if (queuedEvent.key == sf::Keyboard::Key::Slash) downPressed = false;
             }
         }
 
-        currentPiece = board.updatePiecePosition(currentPiece, &moveRightState, std::chrono::high_resolution_clock::now());
-        currentPiece = board.updatePiecePosition(currentPiece, &moveLeftState, std::chrono::high_resolution_clock::now());
+        board.currentPiece = board.updatePiecePosition(board.currentPiece, &moveRightState, std::chrono::high_resolution_clock::now());
+        board.currentPiece = board.updatePiecePosition(board.currentPiece, &moveLeftState, std::chrono::high_resolution_clock::now());
 
         window.clear(sf::Color(30, 30, 30));
 
         if(downPressed){
-            for(;;currentPiece.y--){
-                if(!board.validPosition(currentPiece)){
-                    currentPiece.y++;
-                    currentPiece.grounded = true;
+            for(;;board.currentPiece.y--){
+                if(!board.validPosition(board.currentPiece)){
+                    board.currentPiece.y++;
+                    board.currentPiece.grounded = true;
                     break;
                 }
             }
@@ -411,21 +373,21 @@ int main() {
 
         timeSinceLastDrop += 60/fps;
         if(timeSinceLastDrop > 30){
-            currentPiece.y--;
-            if(!board.validPosition(currentPiece)){
-                currentPiece.grounded = true;
-                currentPiece.y++;
+            board.currentPiece.y--;
+            if(!board.validPosition(board.currentPiece)){
+                board.currentPiece.grounded = true;
+                board.currentPiece.y++;
             }
             timeSinceLastDrop = 0;
         }
 
-        if(currentPiece.grounded){
+        if(board.currentPiece.grounded){
             timeOnGround += 60/fps;
             if(timeOnGround >= 100){
-                board.placePiece(currentPiece);
-                currentPiece.piece = getNextPiece();
-                currentPiece.reset(currentPiece.piece, 0, 3, board.height + 1, false);
-                held = false;
+                board.placePiece(board.currentPiece);
+                board.currentPiece.piece = board.getNextPiece();
+                board.currentPiece.reset(board.currentPiece.piece, 0, 3, board.height + 1, false);
+                board.held = false;
                 timeOnGround = 0;
                 timeSinceLastDrop = 0;
                 board.clearLines();
@@ -434,12 +396,12 @@ int main() {
 
         if(showDebug){
             std::string status = "FPS: " + std::to_string(static_cast<int>(fps)) + 
-                                    " | Piece X: " + std::to_string(currentPiece.x) + 
-                                    ", Piece Y: " + std::to_string(currentPiece.y);
+                                    " | Piece X: " + std::to_string(board.currentPiece.x) + 
+                                    ", Piece Y: " + std::to_string(board.currentPiece.y);
             debug(window, status);
         }
 
-        drawBoard(window, texture, board, currentPiece, holdPiece);
+        drawBoard(window, texture, board);
 
         window.display();
     }
