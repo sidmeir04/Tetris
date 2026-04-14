@@ -81,7 +81,7 @@ struct Board {
             for(int j = 0; j < piece[0].size(); j++){
                 if(piece[i][j]){
                     x = state.x + j;
-                    gridRow = state.y - i;  // y=0 is bottom; state.y is piece top, i=0 is top of piece
+                    gridRow = state.y - i;
                     if((x < 0) || (gridRow < 0)){
                         return false;
                     }
@@ -100,7 +100,7 @@ struct Board {
     int clearLines() {
         int linesCleared = 0;
 
-        for (int i = height - 1; i >= 0; i--) {
+        for (int i = height+4; i >= 0; i--) {
             bool isFull = true;
 
             for (int j = 0; j < width; j++) {
@@ -112,7 +112,7 @@ struct Board {
 
             if (isFull) {
                 grid.erase(grid.begin() + i);
-                grid.insert(grid.begin() + (height - 1), std::vector<int>(width, 0));
+                grid.insert(grid.begin() + (height + 4), std::vector<int>(width, 0));
                 i++; 
                 linesCleared++;
             }
@@ -120,7 +120,7 @@ struct Board {
         return linesCleared;
     }
 
-    void placePiece(const PieceState& state){
+    bool placePiece(const PieceState& state){
         std::vector<std::vector<int>> piece = getPiece(state);
         int x;
         int gridRow;
@@ -129,12 +129,20 @@ struct Board {
                 if(piece[i][j]){
                     x = state.x + j;
                     gridRow = state.y - i;  // y=0 is bottom; state.y is piece top
-                    if(gridRow >= 0 && gridRow < height){
+                    if(gridRow >= 0){
                         grid[gridRow][x] = piece[i][j];
                     }
                 }
             }
         }
+        currentPiece.reset(getNextPiece(), 0, 3, height+2, false);
+        held = false;
+        clearLines();
+        if (!validPosition(currentPiece)) {
+            resetGame(width, height);
+            return false;
+        }
+        return true;
     }
 
     PieceState movePiece(PieceState currentPiece, int movement){
