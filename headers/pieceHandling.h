@@ -7,8 +7,8 @@ struct InputState {
     bool isPressed = false;
     std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> lastRepeat;
-    const std::chrono::milliseconds DAS_DELAY;
-    const std::chrono::milliseconds ARR_INTERVAL;
+    std::chrono::milliseconds DAS_DELAY;
+    std::chrono::milliseconds ARR_INTERVAL;
     bool dasTriggered = false;
     int movement;
 

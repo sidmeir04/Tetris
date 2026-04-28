@@ -12,7 +12,8 @@ find_package(SFML 3 COMPONENTS Graphics Window System REQUIRED)
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 # 3. Create the executable using the found source files
-add_executable(Tetris ${SOURCES})
+add_executable(Tetris ${SOURCES}
+    headers/SettingsUI.hpp)
 
 # Copy assets folder to build directory
 add_custom_command(TARGET Tetris POST_BUILD
