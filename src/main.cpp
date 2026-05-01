@@ -52,7 +52,6 @@ struct InputEventQueue {
             size++;
             return;
         }
-        // Keep latest real-time events when queue is full.
         events[head] = event;
         head = (head + 1) % CAPACITY;
     }
@@ -79,11 +78,28 @@ void debug(sf::RenderWindow& window, std::string status){
     window.draw(text);
 }
 
+void drawPiece(sf::RenderWindow& window, sf::Sprite& sprite, int piece, int rotation, int x, int y, int tileSize){
+    std::vector<std::vector<int>> pieceGrid = getPiece({piece, rotation});
+    for(int i = 0; i < 4; i++){
+        for(int j = 0; j < 4; j++){
+            int val = pieceGrid[i][j];
+            if(val){
+                sf::IntRect textureRect({(val + 1) * 32, 0}, {tileSize, tileSize});
+                sprite.setTextureRect(textureRect);
+
+                sprite.setPosition({static_cast<float>(j * tileSize + x), static_cast<float>(i * tileSize + y)});
+
+                window.draw(sprite);
+            }
+        }
+    }
+}
+
 void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board) {
     PieceState currentPiece = board.currentPiece;
     int holdPiece = board.holdPiece;
     const int tileSize = 32;
-    int xBuffer = 140;
+    int xBuffer = 200;
     int yBuffer = 80;
 
     int previewXOffset = xBuffer + (board.width * tileSize) + 20;
@@ -93,7 +109,7 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board) {
     rect.setOutlineColor(sf::Color(128, 128, 128));
     rect.setOutlineThickness(1.f);
 
-    //Draw the board (y=0 at bottom: row 0 drawn at bottom of board area)
+    //Draw the board
     for (int i = 0; i < board.height; i++) {
         for (int j = 0; j < board.width; j++) {
             float screenY = static_cast<float>((board.height - 1 - i) * tileSize + yBuffer);
@@ -117,95 +133,31 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board) {
         }
     }
 
+    //Draw Current Piece
     sf::Sprite piece(texture);
-    //Draw Current Piece (only blocks on board; y=0 at bottom)
-    for(int i = 0; i < 4; i++){
-        for(int j = 0; j < 4; j++){
-            int val = getPiece(currentPiece)[i][j];
-            if(val){
-                int gridRow = currentPiece.y - i;
-                if(gridRow < 0) continue;
-                float x = static_cast<float>((j + currentPiece.x) * tileSize + xBuffer);
-                float screenY = static_cast<float>((board.height - 1 - gridRow) * tileSize + yBuffer);
-                sf::IntRect textureRect({(val + 1) * tileSize, 0}, {tileSize, tileSize});
-                piece.setTextureRect(textureRect);
-
-                piece.setPosition({x, screenY});
-
-                window.draw(piece);
-            }
-        }
-    }
+    drawPiece(window, piece, currentPiece.piece, currentPiece.rotation, currentPiece.x*tileSize + xBuffer, (board.height - 1 - currentPiece.y) * tileSize + yBuffer, tileSize);
 
     //Draw the hold piece
-    sf::Sprite hold(texture);
     if(holdPiece != -1){
-        for(int i = 0; i < 4; i++){
-            for(int j = 0; j < 4; j++){
-                int val = getPiece({holdPiece,0})[i][j];
-                if(val){
-                    float x = static_cast<float>(j * tileSize + xBuffer - 150);
-                    float y = static_cast<float>(i * tileSize + yBuffer + 10);
-
-                    sf::IntRect textureRect({(val + 1) * tileSize, 0}, {tileSize, tileSize});
-                    hold.setTextureRect(textureRect);
-
-                    hold.setPosition({x, y});
-
-                    window.draw(hold);
-                }
-            }
-        }
+        sf::Sprite hold(texture);
+        drawPiece(window, hold, holdPiece, 0, xBuffer - 150, yBuffer + 10, tileSize);
     }
     
-    //Draw the ghost (y decreases downward; find lowest valid y)
+    //Draw the ghost
     sf::Sprite ghost(texture);
     ghost.setColor(sf::Color(255, 255, 255, 102));
     int ghostY = currentPiece.y;
     for(;;ghostY--){
         if(!board.validPosition({currentPiece.piece, currentPiece.rotation, currentPiece.x, ghostY})) break;
     }
-    ghostY++;  // backtrack to last valid position
-
-    for(int i = 0; i < 4; i++){
-        for(int j = 0; j < 4; j++){
-            int val = getPiece(currentPiece)[i][j];
-            if(val){
-                int gridRow = ghostY - i;
-                if(gridRow < 0 || gridRow >= board.height) continue;
-                float x = static_cast<float>((j + currentPiece.x) * tileSize + xBuffer);
-                float screenY = static_cast<float>((board.height - 1 - gridRow) * tileSize + yBuffer);
-
-                sf::IntRect textureRect({(val + 1) * tileSize, 0}, {tileSize, tileSize});
-                ghost.setTextureRect(textureRect);
-
-                ghost.setPosition({x, screenY});
-
-                window.draw(ghost);
-            }
-        }
-    }
+    ghostY++;
+    drawPiece(window, ghost, currentPiece.piece, currentPiece.rotation, currentPiece.x*tileSize + xBuffer, (board.height - 1 - ghostY) * tileSize + yBuffer, tileSize);
 
     //Draw the preview
     sf::Sprite previewSprite(texture);
     for (int k = 0; k < 5; k++) {
         int pieceID = board.pieceQueue[k];
-        auto shape = getPiece({pieceID, 0});
-
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                if (shape[i][j]) {
-                    float x = static_cast<float>(j * tileSize + previewXOffset);
-                    float y = static_cast<float>(i * tileSize + yBuffer + 20 + (k * 100));
-
-                    sf::IntRect textureRect({(shape[i][j] + 1) * tileSize, 0}, {tileSize, tileSize});
-                    previewSprite.setTextureRect(textureRect);
-                    previewSprite.setPosition({x, y});
-                    
-                    window.draw(previewSprite);
-                }
-            }
-        }
+        drawPiece(window, previewSprite, pieceID, 0, previewXOffset, yBuffer + 20 + (k * 100), tileSize);
     }
 }
 
@@ -403,27 +355,27 @@ int main() {
                     if (!moveRightState.isPressed) {
                         moveRightState.press(keyPressTime);
                         moveLeftState.release();
-                        board.currentPiece = board.movePiece(board.currentPiece, 1);
+                        board.movePiece(board.currentPiece, 1);
                     }
                 }
                 if (queuedEvent.key == data.keyBindings[1].key) {
                     if (!moveLeftState.isPressed) {
                         moveLeftState.press(keyPressTime);
                         moveRightState.release();
-                        board.currentPiece = board.movePiece(board.currentPiece, -1);
+                        board.movePiece(board.currentPiece, -1);
                     }
                 }
 
                 if (queuedEvent.key == data.keyBindings[2].key) {
-                    board.currentPiece = board.rotatePiece(board.currentPiece, 1);
+                    board.rotatePiece(board.currentPiece, 1);
                 }
 
                 if (queuedEvent.key == data.keyBindings[3].key) {
-                    board.currentPiece = board.rotatePiece(board.currentPiece, -1);
+                    board.rotatePiece(board.currentPiece, -1);
                 }
 
                 if (queuedEvent.key == data.keyBindings[4].key) {
-                    board.currentPiece = board.rotatePiece(board.currentPiece, 2);
+                    board.rotatePiece(board.currentPiece, 2);
                 }
 
                 if (queuedEvent.key == data.keyBindings[5].key) {
@@ -443,17 +395,15 @@ int main() {
                 }
 
                 if (queuedEvent.key == data.keyBindings[6].key) {
-                    for(;;board.currentPiece.y--){
-                        if(!board.validPosition(board.currentPiece)){
-                            board.placePiece({board.currentPiece.piece, board.currentPiece.rotation, board.currentPiece.x, board.currentPiece.y+1});
-                            timeOnGround = 0;
-                            timeSinceLastDrop = 0;
-                            break;
-                        }
-                    }
+                    for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
+                    board.placePiece(board.currentPiece);
+                    timeOnGround = 0;
+                    timeSinceLastDrop = 0;
                 }
 
                 if (queuedEvent.key == data.keyBindings[7].key) {
+                    for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
+                    board.currentPiece.grounded = true;
                     downPressed = true;
                 }
 
@@ -490,46 +440,35 @@ int main() {
             }
         }
 
-        board.currentPiece = board.updatePiecePosition(board.currentPiece, &moveRightState, std::chrono::high_resolution_clock::now());
-        board.currentPiece = board.updatePiecePosition(board.currentPiece, &moveLeftState, std::chrono::high_resolution_clock::now());
+        board.updatePiecePosition(board.currentPiece, &moveRightState, std::chrono::high_resolution_clock::now());
+        board.updatePiecePosition(board.currentPiece, &moveLeftState, std::chrono::high_resolution_clock::now());
 
         window.clear(sf::Color(30, 30, 30));
 
         if(downPressed){
-            for(;;board.currentPiece.y--){
-                if(!board.validPosition(board.currentPiece)){
-                    board.currentPiece.y++;
-                    board.currentPiece.grounded = true;
-                    break;
-                }
-            }
+            for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
+            board.currentPiece.grounded = true;
         }
-
         
         timeSinceLastDrop += 60/fps;
         if(board.currentPiece.grounded){
-            board.currentPiece.y--;
-            if(board.validPosition(board.currentPiece)){
+            if(board.validPosition(board.currentPiece, -1)){
                 timeOnGround = 0;
                 timeSinceLastDrop = 0;
                 board.currentPiece.grounded = false;
-                board.currentPiece.y++;
-            } else {
-                board.currentPiece.y++;
-                timeOnGround += 60/fps;
-                if(timeOnGround >= 100){
-                    board.placePiece(board.currentPiece);
-                    timeOnGround = 0;
-                    timeSinceLastDrop = 0;
-                }
+            }
+            timeOnGround += 60/fps;
+            if(timeOnGround >= 100){
+                board.placePiece(board.currentPiece);
+                timeOnGround = 0;
+                timeSinceLastDrop = 0;
             }
         }
 
-        if(timeSinceLastDrop > 60){
+        if((timeSinceLastDrop > 60) && (!board.currentPiece.grounded)){
             board.currentPiece.y--;
-            if(!board.validPosition(board.currentPiece)){
+            if(!board.validPosition(board.currentPiece, -1)){
                 board.currentPiece.grounded = true;
-                board.currentPiece.y++;
             }
             timeSinceLastDrop = 0;
         }
