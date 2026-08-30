@@ -10,6 +10,7 @@
 #include "pieceState.h"
 #include "srsTable.h"
 #include "pieceHandling.h"
+#include "guide.h"
 
 struct Board {
     int width;
@@ -21,7 +22,9 @@ struct Board {
     std::deque<int> pieceQueue;
     PieceState currentPiece;
     int holdPiece = -1;
+    int piecesPlaced = 0;
     bool held = false;
+    Guide guide;
 
     int generateNextPiece() {
         if (pieceBag.empty()) {
@@ -124,7 +127,8 @@ struct Board {
           grid(h + 5, std::vector<int>(w, 0)),
           gen(static_cast<unsigned int>(
               std::chrono::system_clock::now().time_since_epoch().count())),
-          currentPiece(0, 0, 0, 0, false) {
+          currentPiece(0, 0, 0, 0, false),
+          guide(SDPCguide1, "Single Double PC") {
         currentPiece = PieceState(getNextPiece(), 0, 3, height - 1, false);
         for (int i = 0; i < 6; i++) {
             pieceQueue.push_back(getNextPiece());
@@ -148,6 +152,8 @@ struct Board {
         currentPiece.reset(currentPiece.piece, 0, 3, height + 1, false);
         currentPiece.piece = getNextPiece();
         holdPiece = -1;
+        piecesPlaced = 0;
+        guide.reset();
     }
 
     bool validPosition(const PieceState& state){
@@ -182,8 +188,8 @@ struct Board {
         return true;
     }
 
-    int clearLines() {
-        int linesCleared = 0;
+    std::vector<int> clearLines() {
+        std::vector<int> linesCleared = {};
         for (int i = height+4; i >= 0; i--) {
             bool isFull = true;
             for (int j = 0; j < width; j++) {
@@ -195,10 +201,11 @@ struct Board {
             if (isFull) {
                 grid.erase(grid.begin() + i);
                 grid.insert(grid.begin() + (height + 4), std::vector<int>(width, 0));
+                linesCleared.push_back(i);
                 i++; 
-                linesCleared++;
             }
         }
+        guide.clearLines(linesCleared, piecesPlaced);
         return linesCleared;
     }
 
@@ -224,6 +231,7 @@ struct Board {
             resetGame(width, height);
             return false;
         }
+        piecesPlaced++;
         return true;
     }
 
@@ -268,6 +276,10 @@ struct Board {
                 return;
             }
         }
+    }
+
+    std::vector<std::vector<int>> getGuideBlock(){
+        return guide.getGuideBlocks(piecesPlaced);
     }
 
 };

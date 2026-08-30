@@ -22,6 +22,7 @@ struct QueuedInputEvent {
 struct GameSettings {
     float masterVolume = 80.f;
     bool vSync = true;
+    bool guideEnabled = false;
     std::vector<KeyBinding> keyBindings = {
         {"Move Right", 'L', sf::Keyboard::Key::L},
         {"Move Left", 'M', sf::Keyboard::Key::M},
@@ -34,7 +35,8 @@ struct GameSettings {
         {"Reset Game", 'R', sf::Keyboard::Key::R},
         {"Toggle Statistics", 'I', sf::Keyboard::Key::I},
         {"Toggle Debug Info", VK_F8, sf::Keyboard::Key::F8},
-        {"Exit Game", VK_ESCAPE, sf::Keyboard::Key::Escape}
+        {"Exit Game", VK_ESCAPE, sf::Keyboard::Key::Escape},
+        {"Toggle Guide", 'G', sf::Keyboard::Key::G}
     };
 };
 
@@ -95,7 +97,7 @@ void drawPiece(sf::RenderWindow& window, sf::Sprite& sprite, int piece, int rota
     }
 }
 
-void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board) {
+void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board, GameSettings settings) {
     PieceState currentPiece = board.currentPiece;
     int holdPiece = board.holdPiece;
     const int tileSize = 32;
@@ -115,6 +117,25 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board) {
             float screenY = static_cast<float>((board.height - 1 - i) * tileSize + yBuffer);
             rect.setPosition({static_cast<float>(j * tileSize + xBuffer), screenY});
             window.draw(rect);
+        }
+    }
+
+    //Draw the piece guide
+    if (settings.guideEnabled){
+        sf::Sprite guideBlock(texture);
+        guideBlock.setColor(sf::Color(255,255,255,75));
+        std::vector<std::vector<int>> guideBlocks = board.getGuideBlock();
+        for (int i = 0; i < guideBlocks.size(); i++) {
+            for (int j = 0; j < guideBlocks[i].size(); j++) {
+                int val = guideBlocks[i][j];
+                if (val > 0) {
+                    float screenY = static_cast<float>((board.height - 1 - i) * tileSize + yBuffer);
+                    sf::IntRect textureRect({(val + 1) * tileSize, 0}, {tileSize, tileSize});
+                    guideBlock.setTextureRect(textureRect);
+                    guideBlock.setPosition({static_cast<float>(j * tileSize + xBuffer), screenY});
+                    window.draw(guideBlock);
+                }
+            }
         }
     }
 
@@ -145,7 +166,7 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board) {
     
     //Draw the ghost
     sf::Sprite ghost(texture);
-    ghost.setColor(sf::Color(255, 255, 255, 102));
+    ghost.setColor(sf::Color(255, 255, 255, 130));
     int ghostY = currentPiece.y;
     for(;;ghostY--){
         if(!board.validPosition({currentPiece.piece, currentPiece.rotation, currentPiece.x, ghostY})) break;
@@ -298,6 +319,8 @@ int main() {
     }
     menu.addPage(std::move(controls));
 
+    SettingsMenu gameSettings;
+
     sf::RectangleShape toggleBtn({110, 40});
     toggleBtn.setPosition({680, 10});
     toggleBtn.setFillColor(sf::Color::Blue);
@@ -305,7 +328,7 @@ int main() {
     InputEventQueue inputQueue;
     std::atomic<bool> inputThreadRunning{true};
     const std::vector<KeyBinding>& trackedKeys = data.keyBindings;
-    std::array<bool, 12> previousState{};
+    std::array<bool, 13> previousState{};
 
     std::thread inputThread([&]() {
         while (inputThreadRunning.load()) {
@@ -351,6 +374,7 @@ int main() {
         while (inputQueue.dequeue(queuedEvent)) {
             auto keyPressTime = queuedEvent.timestamp;
             if (queuedEvent.pressed) {
+                // Move Right
                 if (queuedEvent.key == data.keyBindings[0].key) {
                     if (!moveRightState.isPressed) {
                         moveRightState.press(keyPressTime);
@@ -358,6 +382,8 @@ int main() {
                         board.movePiece(board.currentPiece, 1);
                     }
                 }
+
+                // Move Left
                 if (queuedEvent.key == data.keyBindings[1].key) {
                     if (!moveLeftState.isPressed) {
                         moveLeftState.press(keyPressTime);
@@ -366,18 +392,22 @@ int main() {
                     }
                 }
 
+                // Rotate Clockwise
                 if (queuedEvent.key == data.keyBindings[2].key) {
                     board.rotatePiece(board.currentPiece, 1);
                 }
 
+                // Rotate Counter-Clockwise
                 if (queuedEvent.key == data.keyBindings[3].key) {
                     board.rotatePiece(board.currentPiece, -1);
                 }
 
+                // Rotate 180
                 if (queuedEvent.key == data.keyBindings[4].key) {
                     board.rotatePiece(board.currentPiece, 2);
                 }
 
+                // Hold Piece
                 if (queuedEvent.key == data.keyBindings[5].key) {
                     if(board.held) continue;
                     if(board.holdPiece != -1){
@@ -394,6 +424,7 @@ int main() {
                     board.held = true;
                 }
 
+                // Hard Drop
                 if (queuedEvent.key == data.keyBindings[6].key) {
                     for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
                     board.placePiece(board.currentPiece);
@@ -401,12 +432,14 @@ int main() {
                     timeSinceLastDrop = 0;
                 }
 
+                // Soft Drop
                 if (queuedEvent.key == data.keyBindings[7].key) {
                     for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
                     board.currentPiece.grounded = true;
                     downPressed = true;
                 }
 
+                // Reset Game
                 if (queuedEvent.key == data.keyBindings[8].key) {
                     board.resetGame(10, 20);
                     board.held = false;
@@ -414,28 +447,41 @@ int main() {
                     timeSinceLastDrop = 0;
                 }
 
+                // Toggle Statistics
                 if (queuedEvent.key == data.keyBindings[9].key) {
                     displayData = !displayData;
                 }
 
+                // Toggle Debug Info
                 if (queuedEvent.key == data.keyBindings[10].key) {
                     showDebug = !showDebug;
                 }
 
+                // Exit Game
                 if (queuedEvent.key == data.keyBindings[11].key) {
                     window.close();
                 }
+
+                // Toggle Guide
+                if (queuedEvent.key == data.keyBindings[12].key) {
+                    data.guideEnabled = !data.guideEnabled;
+                }
             } else {
+                // Released Move Right
                 if (queuedEvent.key == sf::Keyboard::Key::L) {
                     board.updatePiecePosition(board.currentPiece, &moveRightState, keyPressTime);
                     releaseTimings.push_back(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(keyPressTime - moveRightState.startTime).count()));
                     moveRightState.release();
                 };
+
+                // Released Move Left
                 if (queuedEvent.key == sf::Keyboard::Key::M) {
                     board.updatePiecePosition(board.currentPiece, &moveLeftState, keyPressTime);
                     releaseTimings.push_back(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(keyPressTime - moveRightState.startTime).count()));
                     moveLeftState.release();
                 };
+
+                // Released Soft Drop
                 if (queuedEvent.key == sf::Keyboard::Key::Slash) downPressed = false;
             }
         }
@@ -502,7 +548,7 @@ int main() {
         if(displayData) {
             drawHistogram(window, releaseTimings, 3*DAS_DELAY.count());
         } else {
-            drawBoard(window, texture, board);
+            drawBoard(window, texture, board, data);
         }
 
         window.draw(toggleBtn);

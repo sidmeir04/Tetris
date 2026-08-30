@@ -37,7 +37,7 @@ int getRotationIndex(int prevRotation, int nextRotation) {
 
 std::vector<std::vector<int>> getOffests(PieceState currentPiece, int lastRotation){
     if(currentPiece.piece==0){
-        return I_KICKS[ getRotationIndex(lastRotation, currentPiece.rotation)];
+        return I_KICKS[getRotationIndex(lastRotation, currentPiece.rotation)];
     }
     return JLSTZ_KICKS[getRotationIndex(lastRotation, currentPiece.rotation)];
 }
