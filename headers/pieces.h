@@ -3,7 +3,13 @@
 
 #include "pieceState.h"
 #include <vector>
-
+// I = 5
+// Square = 4
+// T = 7
+// L = 2
+// J = 6
+// S = 1
+// Z = 3
 std::vector<std::vector<std::vector<std::vector<int>>>> pieces = {
     //Line
     {

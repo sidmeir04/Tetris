@@ -5,6 +5,7 @@
 #include <chrono>
 #include <mutex>
 #include <thread>
+#include <queue>
 #include <atomic>
 #include <windows.h>
 #include <iostream>
@@ -36,12 +37,13 @@ struct GameSettings {
         {"Toggle Statistics", 'I', sf::Keyboard::Key::I},
         {"Toggle Debug Info", VK_F8, sf::Keyboard::Key::F8},
         {"Exit Game", VK_ESCAPE, sf::Keyboard::Key::Escape},
-        {"Toggle Guide", 'G', sf::Keyboard::Key::G}
+        {"Toggle Guide", 'G', sf::Keyboard::Key::G},
+        {"Undo", 'Z', sf::Keyboard::Key::Z}
     };
 };
 
 struct InputEventQueue {
-    static constexpr std::size_t CAPACITY = 12;
+    static constexpr std::size_t CAPACITY = 13;
     std::array<QueuedInputEvent, CAPACITY> events{};
     std::size_t head = 0;
     std::size_t size = 0;
@@ -99,7 +101,7 @@ void drawPiece(sf::RenderWindow& window, sf::Sprite& sprite, int piece, int rota
 
 void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board, GameSettings settings) {
     PieceState currentPiece = board.currentPiece;
-    int holdPiece = board.holdPiece;
+    int heldPiece = board.heldPiece;
     const int tileSize = 32;
     int xBuffer = 200;
     int yBuffer = 80;
@@ -159,9 +161,9 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board, Gam
     drawPiece(window, piece, currentPiece.piece, currentPiece.rotation, currentPiece.x*tileSize + xBuffer, (board.height - 1 - currentPiece.y) * tileSize + yBuffer, tileSize);
 
     //Draw the hold piece
-    if(holdPiece != -1){
+    if(heldPiece != -1){
         sf::Sprite hold(texture);
-        drawPiece(window, hold, holdPiece, 0, xBuffer - 150, yBuffer + 10, tileSize);
+        drawPiece(window, hold, heldPiece, 0, xBuffer - 150, yBuffer + 10, tileSize);
     }
     
     //Draw the ghost
@@ -176,7 +178,7 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board, Gam
 
     //Draw the preview
     sf::Sprite previewSprite(texture);
-    for (int k = 0; k < 5; k++) {
+    for (int k = 0; k < std::min(static_cast<int>(board.pieceQueue.size()), 5); k++) {
         int pieceID = board.pieceQueue[k];
         drawPiece(window, previewSprite, pieceID, 0, previewXOffset, yBuffer + 20 + (k * 100), tileSize);
     }
@@ -285,9 +287,11 @@ int main() {
 
     std::vector<int> releaseTimings;
 
-    bool downPressed = false;
+    int maxTimeGrounded = 60;
 
+    bool downPressed = false;
     bool displayData = false;
+    bool gameOver = false;
 
     float timeSinceLastDrop = 0;
     float timeOnGround = 0;
@@ -328,7 +332,7 @@ int main() {
     InputEventQueue inputQueue;
     std::atomic<bool> inputThreadRunning{true};
     const std::vector<KeyBinding>& trackedKeys = data.keyBindings;
-    std::array<bool, 13> previousState{};
+    std::array<bool, 14> previousState{};
 
     std::thread inputThread([&]() {
         while (inputThreadRunning.load()) {
@@ -345,9 +349,19 @@ int main() {
 
     sf::Clock fpsClock;
 
+    std::vector<float> frameTimes;
+    float fps;
     while (window.isOpen()) {
         sf::Time dt = fpsClock.restart();
-        float fps = 1.0f / dt.asSeconds();
+        frameTimes.push_back(1.0f / dt.asSeconds());
+        if(frameTimes.size() > 10){
+            float totalFps = 0.f;
+            for (const float frameTime : frameTimes) {
+                totalFps += frameTime;
+            }
+            fps = totalFps / static_cast<float>(frameTimes.size());
+            frameTimes.clear();
+        }
         while (const std::optional event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
                 window.close();
@@ -409,25 +423,15 @@ int main() {
 
                 // Hold Piece
                 if (queuedEvent.key == data.keyBindings[5].key) {
-                    if(board.held) continue;
-                    if(board.holdPiece != -1){
-                        int temp = board.holdPiece;
-                        board.holdPiece = board.currentPiece.piece;
-                        board.currentPiece.piece = temp;
-                    } else {
-                        board.holdPiece = board.currentPiece.piece;
-                        board.currentPiece.piece = board.getNextPiece();
-                    }
-                    board.currentPiece.reset(board.currentPiece.piece, 0, 3, board.height + 2, false);
+                    board.holdPiece(board.currentPiece);
                     timeOnGround = 0;
                     timeSinceLastDrop = 0;
-                    board.held = true;
                 }
 
                 // Hard Drop
                 if (queuedEvent.key == data.keyBindings[6].key) {
                     for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
-                    board.placePiece(board.currentPiece);
+                    if(!board.placePiece(board.currentPiece)) gameOver = true;
                     timeOnGround = 0;
                     timeSinceLastDrop = 0;
                 }
@@ -466,23 +470,30 @@ int main() {
                 if (queuedEvent.key == data.keyBindings[12].key) {
                     data.guideEnabled = !data.guideEnabled;
                 }
+
+                // Undo move
+                if (queuedEvent.key == data.keyBindings[13].key) {
+                    board.undoPiece();
+                    timeOnGround = 0;
+                    timeSinceLastDrop = 0;
+                }
             } else {
                 // Released Move Right
-                if (queuedEvent.key == sf::Keyboard::Key::L) {
+                if (queuedEvent.key == data.keyBindings[0].key) {
                     board.updatePiecePosition(board.currentPiece, &moveRightState, keyPressTime);
                     releaseTimings.push_back(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(keyPressTime - moveRightState.startTime).count()));
                     moveRightState.release();
                 };
 
                 // Released Move Left
-                if (queuedEvent.key == sf::Keyboard::Key::M) {
+                if (queuedEvent.key == data.keyBindings[1].key) {
                     board.updatePiecePosition(board.currentPiece, &moveLeftState, keyPressTime);
                     releaseTimings.push_back(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(keyPressTime - moveRightState.startTime).count()));
                     moveLeftState.release();
                 };
 
                 // Released Soft Drop
-                if (queuedEvent.key == sf::Keyboard::Key::Slash) downPressed = false;
+                if (queuedEvent.key == data.keyBindings[7].key) downPressed = false;
             }
         }
 
@@ -496,16 +507,16 @@ int main() {
             board.currentPiece.grounded = true;
         }
         
-        timeSinceLastDrop += 60/fps;
+        timeSinceLastDrop += 60/static_cast<float>(frameRate);
         if(board.currentPiece.grounded){
             if(board.validPosition(board.currentPiece, -1)){
                 timeOnGround = 0;
                 timeSinceLastDrop = 0;
                 board.currentPiece.grounded = false;
             }
-            timeOnGround += 60/fps;
-            if(timeOnGround >= 100){
-                board.placePiece(board.currentPiece);
+            timeOnGround += 60/static_cast<float>(frameRate);
+            if(timeOnGround >= maxTimeGrounded){
+                if(!board.placePiece(board.currentPiece)) gameOver = true;
                 timeOnGround = 0;
                 timeSinceLastDrop = 0;
             }
@@ -536,6 +547,11 @@ int main() {
             frameRateRefrence = frameRate;
         }
 
+        if(gameOver){
+            board.resetGame(board.width, board.height);
+            gameOver = false;
+        }
+
         if(showDebug) {
             std::string status = "FPS: " + std::to_string(static_cast<int>(fps)) + 
                                     " | Piece X: " + std::to_string(board.currentPiece.x) + 
@@ -543,7 +559,6 @@ int main() {
                                     ", Grounded: " + std::to_string(board.currentPiece.grounded);
             debug(window, status);
         }
-
 
         if(displayData) {
             drawHistogram(window, releaseTimings, 3*DAS_DELAY.count());

@@ -1,5 +1,6 @@
 #include <vector>
 #include <deque>
+#include <stack>
 #include <random>
 #include <map>
 #include <set>
@@ -12,16 +13,44 @@
 #include "pieceHandling.h"
 #include "guide.h"
 
+struct BoardSnapShot {
+    PieceState placedPiece;
+
+    bool linesCleared;
+    std::vector<int> lineIndexes;
+    std::vector<std::vector<int>> lineInformation;
+
+    bool held;
+    int heldPiece;
+
+    BoardSnapShot()
+        : placedPiece(0, 0, 0, 0, false),
+          linesCleared(false),
+          held(false),
+          heldPiece(-1) {}
+
+    void reset() {
+        placedPiece.reset(0, 0, 0, 0, false);
+        linesCleared = false;
+        lineIndexes.clear();
+        lineInformation.clear();
+        held = false;
+        heldPiece = -1;
+    }
+};
+
 struct Board {
     int width;
     int height;
     std::vector<std::vector<int>> grid;
+    std::stack<BoardSnapShot> moveHistory;
+    BoardSnapShot currentMove;
 
     std::vector<int> pieceBag;
     std::mt19937 gen;
     std::deque<int> pieceQueue;
     PieceState currentPiece;
-    int holdPiece = -1;
+    int heldPiece = -1;
     int piecesPlaced = 0;
     bool held = false;
     Guide guide;
@@ -39,7 +68,9 @@ struct Board {
     }
 
     int getNextPiece() {
-        pieceQueue.push_back(generateNextPiece());
+        if(pieceQueue.size() < 6) {
+            pieceQueue.push_back(generateNextPiece());
+        }
 
         int nextPiece = pieceQueue.front();
         pieceQueue.pop_front();
@@ -131,8 +162,24 @@ struct Board {
           guide(SDPCguide1, "Single Double PC") {
         currentPiece = PieceState(getNextPiece(), 0, 3, height - 1, false);
         for (int i = 0; i < 6; i++) {
-            pieceQueue.push_back(getNextPiece());
+            pieceQueue.push_back(generateNextPiece());
         }
+    }
+
+    bool validPosition(const PieceState& state, int yOffset = 0) {
+        std::vector<std::vector<int>> piece = getPiece(state);
+        int x;
+        int gridRow;
+        for (int i = 0; i < piece.size(); i++) {
+            for (int j = 0; j < piece[0].size(); j++) {
+                if (piece[i][j]) {
+                    x = state.x + j;
+                    gridRow = state.y - i + yOffset;
+                    if ((x < 0) || (x >= width) || (gridRow < 0) || grid[gridRow][x]) return false;
+                }
+            }
+        }
+        return true;
     }
 
     void resetBoard(int w, int h){
@@ -151,41 +198,9 @@ struct Board {
         }
         currentPiece.reset(currentPiece.piece, 0, 3, height + 1, false);
         currentPiece.piece = getNextPiece();
-        holdPiece = -1;
+        heldPiece = -1;
         piecesPlaced = 0;
         guide.reset();
-    }
-
-    bool validPosition(const PieceState& state){
-        std::vector<std::vector<int>> piece = getPiece(state);
-        int x;
-        int gridRow;
-        for(int i = 0; i < piece.size(); i++){
-            for(int j = 0; j < piece[0].size(); j++){
-                if(piece[i][j]){
-                    x = state.x + j;
-                    gridRow = state.y - i;
-                    if((x < 0) || (x >= width) ||(gridRow < 0) || grid[gridRow][x]) return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    bool validPosition(const PieceState& state, int yOffset){
-        std::vector<std::vector<int>> piece = getPiece(state);
-        int x;
-        int gridRow;
-        for(int i = 0; i < piece.size(); i++){
-            for(int j = 0; j < piece[0].size(); j++){
-                if(piece[i][j]){
-                    x = state.x + j;
-                    gridRow = state.y - i + yOffset;
-                    if((x < 0) || (x >= width) ||(gridRow < 0) || grid[gridRow][x]) return false;
-                }
-            }
-        }
-        return true;
     }
 
     std::vector<int> clearLines() {
@@ -199,13 +214,16 @@ struct Board {
                 }
             }
             if (isFull) {
-                grid.erase(grid.begin() + i);
+                currentMove.lineInformation.push_back(*grid.erase(grid.begin() + i));
                 grid.insert(grid.begin() + (height + 4), std::vector<int>(width, 0));
                 linesCleared.push_back(i);
-                i++; 
+                i++;
             }
         }
+
         guide.clearLines(linesCleared, piecesPlaced);
+        currentMove.lineIndexes = linesCleared;
+
         return linesCleared;
     }
 
@@ -224,15 +242,43 @@ struct Board {
                 }
             }
         }
+        currentMove.placedPiece = currentPiece;
+        moveHistory.push(currentMove);
         currentPiece.reset(getNextPiece(), 0, 3, height+2, false);
         held = false;
         clearLines();
-        if (!validPosition(currentPiece)) {
-            resetGame(width, height);
-            return false;
-        }
+        if (!validPosition(currentPiece, -1)) currentPiece.grounded = true;
         piecesPlaced++;
+        if (!validPosition(currentPiece)) return false;
         return true;
+    }
+
+    void undoPiece() {
+        BoardSnapShot lastMove = moveHistory.top();
+        std::vector<std::vector<int>> piece = getPiece(lastMove.placedPiece);
+        int x;
+        int gridRow;
+        for(int i = 0; i < piece.size(); i++){
+            for(int j = 0; j < piece[0].size(); j++){
+                if(piece[i][j]){
+                    x = lastMove.placedPiece.x + j;
+                    gridRow = lastMove.placedPiece.y - i;
+                    if(gridRow >= 0){
+                        grid[gridRow][x] = 0;
+                    }
+                }
+            }
+        }
+        pieceQueue.push_front(currentPiece.piece);
+        if(!lastMove.held){
+            currentPiece.reset(lastMove.placedPiece.piece, 0, 3, height+2, false);
+        } else {
+            heldPiece = lastMove.placedPiece.piece;
+            currentPiece.reset(lastMove.heldPiece, 0, 3, height+2, false);
+        }
+        held = false;
+        currentMove.reset();
+        moveHistory.pop();
     }
 
     void movePiece(PieceState& currentPiece, int movement){
@@ -276,6 +322,23 @@ struct Board {
                 return;
             }
         }
+    }
+
+    void holdPiece(PieceState& currentPiece) {
+        if(held) return;
+
+        currentMove.held = true;
+        if(heldPiece != -1){
+            currentMove.heldPiece = currentPiece.piece; // Also using the 'temp' variable
+            currentPiece.piece = heldPiece;
+            heldPiece = currentMove.heldPiece;
+        } else {
+            currentMove.heldPiece = -1;
+            heldPiece = currentPiece.piece;
+            currentPiece.piece = getNextPiece();
+        }
+        currentPiece.reset(currentPiece.piece, 0, 3, height + 2, false);
+        held = true;
     }
 
     std::vector<std::vector<int>> getGuideBlock(){

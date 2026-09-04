@@ -25,6 +25,35 @@ std::vector<std::vector<int>> SDPCguide2 = {
     {5,0,0,0,0,0,0,0,0,0}
 };
 
+std::vector<std::vector<int>> new_DT_cannon1 = {
+    {4,4,0,2,2,2,5,6,6,6},
+    {4,4,0,3,3,2,5,6,1,1},
+    {0,0,0,0,3,3,5,1,1,0},
+    {0,0,0,7,7,7,5,0,0,0},
+    {0,0,0,0,7,0,0,0,0,0}
+};
+
+std::vector<std::vector<int>> new_DT_cannon2 = {
+    {0,0,0,0,0,0,0,0,0,0},
+    {0,0,7,0,0,0,0,0,0,0},
+    {6,7,7,7,0,0,0,0,0,5},
+    {6,0,0,0,0,0,0,4,4,5},
+    {6,6,0,2,0,3,1,4,4,5},
+    {0,0,0,2,3,3,1,1,0,5},
+    {0,0,2,2,3,0,0,1,0,0}
+};
+
+std::vector<std::vector<int>> new_DT_cannon3 = {
+    {0,0,7,0,0,0,0,0,0,0},
+    {0,7,7,0,0,0,0,0,0,0},
+    {0,0,7,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,1,0},
+    {0,0,0,0,0,5,6,0,1,1},
+    {0,0,4,4,2,5,6,3,3,1},
+    {0,0,4,4,2,5,6,6,3,3},
+    {0,0,0,2,2,5,0,0,0,0}
+};
+
 struct Guide
 {
     std::vector<std::vector<int>> guideBlocks;
@@ -37,15 +66,32 @@ struct Guide
     Guide(std::vector<std::vector<int>> blocks, std::string name)
         : guideBlocks(blocks),
           guideName(std::move(name)) {
+
         refrenceRanges.set(std::make_pair(
             boost::icl::discrete_interval<int>::closed(0, 6),
-            SDPCguide1
+            new_DT_cannon1
         ));
 
         refrenceRanges.set(std::make_pair(
             boost::icl::discrete_interval<int>::closed(7, 13),
-            SDPCguide2
+            new_DT_cannon2
         ));
+
+        refrenceRanges.set(std::make_pair(
+            boost::icl::discrete_interval<int>::closed(14, 20),
+            new_DT_cannon3
+        ));
+
+
+        // refrenceRanges.set(std::make_pair(
+        //     boost::icl::discrete_interval<int>::closed(0, 6),
+        //     SDPCguide1
+        // ));
+
+        // refrenceRanges.set(std::make_pair(
+        //     boost::icl::discrete_interval<int>::closed(7, 13),
+        //     SDPCguide2
+        // ));
 
         ranges = refrenceRanges;
     }
