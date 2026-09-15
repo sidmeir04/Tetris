@@ -214,8 +214,11 @@ struct Board {
                 }
             }
             if (isFull) {
-                currentMove.lineInformation.push_back(*grid.erase(grid.begin() + i));
+                // Same line for all lines cleared, sometimes??? not t-spin but tetris????
+                std::vector<int> clearedLine = *(grid.begin() + i);
+                grid.erase(grid.begin() + i);
                 grid.insert(grid.begin() + (height + 4), std::vector<int>(width, 0));
+                currentMove.lineInformation.push_back(clearedLine);
                 linesCleared.push_back(i);
                 i++;
             }
@@ -223,6 +226,7 @@ struct Board {
 
         guide.clearLines(linesCleared, piecesPlaced);
         currentMove.lineIndexes = linesCleared;
+        currentMove.linesCleared = true;
 
         return linesCleared;
     }
@@ -243,10 +247,11 @@ struct Board {
             }
         }
         currentMove.placedPiece = currentPiece;
+        clearLines();
         moveHistory.push(currentMove);
+        currentMove.reset();
         currentPiece.reset(getNextPiece(), 0, 3, height+2, false);
         held = false;
-        clearLines();
         if (!validPosition(currentPiece, -1)) currentPiece.grounded = true;
         piecesPlaced++;
         if (!validPosition(currentPiece)) return false;
@@ -254,10 +259,18 @@ struct Board {
     }
 
     void undoPiece() {
+        if (moveHistory.empty()) return;
+
         BoardSnapShot lastMove = moveHistory.top();
-        std::vector<std::vector<int>> piece = getPiece(lastMove.placedPiece);
+        if(lastMove.linesCleared){
+            for(auto it = lastMove.lineIndexes.rbegin(); it != lastMove.lineIndexes.rend(); ++it){
+                grid.insert(grid.begin() + *it, lastMove.lineInformation.back());
+                lastMove.lineInformation.pop_back();
+            }
+        }
         int x;
         int gridRow;
+        std::vector<std::vector<int>> piece = getPiece(lastMove.placedPiece);
         for(int i = 0; i < piece.size(); i++){
             for(int j = 0; j < piece[0].size(); j++){
                 if(piece[i][j]){
@@ -271,6 +284,10 @@ struct Board {
         }
         pieceQueue.push_front(currentPiece.piece);
         if(!lastMove.held){
+            currentPiece.reset(lastMove.placedPiece.piece, 0, 3, height+2, false);
+            held = false;
+        } else if (lastMove.heldPiece == -1) {
+            heldPiece = -1;
             currentPiece.reset(lastMove.placedPiece.piece, 0, 3, height+2, false);
         } else {
             heldPiece = lastMove.placedPiece.piece;

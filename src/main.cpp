@@ -352,8 +352,9 @@ int main() {
     std::vector<float> frameTimes;
     float fps;
     while (window.isOpen()) {
-        sf::Time dt = fpsClock.restart();
-        frameTimes.push_back(1.0f / dt.asSeconds());
+        sf::Time frameTime = fpsClock.restart();
+        float frameLength = 1.0f / frameTime.asSeconds();
+        frameTimes.push_back(frameLength);
         if(frameTimes.size() > 10){
             float totalFps = 0.f;
             for (const float frameTime : frameTimes) {
@@ -507,27 +508,26 @@ int main() {
             board.currentPiece.grounded = true;
         }
         
-        timeSinceLastDrop += 60/static_cast<float>(frameRate);
+        
         if(board.currentPiece.grounded){
-            if(board.validPosition(board.currentPiece, -1)){
-                timeOnGround = 0;
-                timeSinceLastDrop = 0;
-                board.currentPiece.grounded = false;
-            }
-            timeOnGround += 60/static_cast<float>(frameRate);
-            if(timeOnGround >= maxTimeGrounded){
-                if(!board.placePiece(board.currentPiece)) gameOver = true;
-                timeOnGround = 0;
-                timeSinceLastDrop = 0;
-            }
-        }
-
-        if((timeSinceLastDrop > 60) && (!board.currentPiece.grounded)){
-            board.currentPiece.y--;
+            // Check if piece is still not grounded
             if(!board.validPosition(board.currentPiece, -1)){
-                board.currentPiece.grounded = true;
+                timeOnGround += 60/frameLength;
+                if(timeOnGround >= maxTimeGrounded){
+                    if(!board.placePiece(board.currentPiece)) gameOver = true;
+                    timeOnGround = 0;
+                    timeSinceLastDrop = 0;
+                }
+            } else board.currentPiece.grounded = false;
+        } else {
+            timeSinceLastDrop += 60/frameLength;
+            if(timeSinceLastDrop > 60) {
+                board.currentPiece.y--;
+                if(!board.validPosition(board.currentPiece, -1)){
+                    board.currentPiece.grounded = true;
+                }
+                timeSinceLastDrop = 0;
             }
-            timeSinceLastDrop = 0;
         }
 
         if(DASint != DAS_DELAY.count()){
