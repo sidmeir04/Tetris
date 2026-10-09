@@ -24,6 +24,7 @@ struct GameSettings {
     float masterVolume = 80.f;
     bool vSync = true;
     bool guideEnabled = false;
+    // Update the size "std::array<bool, 15> previousState{};" when adding new key binds
     std::vector<KeyBinding> keyBindings = {
         {"Move Right", 'L', sf::Keyboard::Key::L},
         {"Move Left", 'M', sf::Keyboard::Key::M},
@@ -38,7 +39,8 @@ struct GameSettings {
         {"Toggle Debug Info", VK_F8, sf::Keyboard::Key::F8},
         {"Exit Game", VK_ESCAPE, sf::Keyboard::Key::Escape},
         {"Toggle Guide", 'G', sf::Keyboard::Key::G},
-        {"Undo", 'Z', sf::Keyboard::Key::Z}
+        {"Undo", 'Z', sf::Keyboard::Key::Z},
+        {"Pause Game", 'P', sf::Keyboard::Key::P},
     };
 };
 
@@ -72,6 +74,68 @@ struct InputEventQueue {
     }
 };
 
+struct FallingState {
+    int baseMaxTimeOnGround = 60;
+    int maxTimeGrounded = baseMaxTimeOnGround;
+    int rotations = 0;
+    float timeSinceLastDrop = 0;
+    float timeOnGround = 0;
+
+    void rotate() {
+        rotations++;
+        maxTimeGrounded += maxTimeGrounded >> (rotations);
+    }
+
+    void reset() {
+        timeSinceLastDrop = 0;
+        timeOnGround = 0;
+        rotations = 0;
+        maxTimeGrounded = baseMaxTimeOnGround;
+    }
+};
+
+struct BoardBackground {
+    sf::RenderTexture renderTexture;
+    sf::Sprite sprite;
+
+    BoardBackground(sf::RenderTexture&& rTex) 
+        : renderTexture(std::move(rTex)), sprite(renderTexture.getTexture()) {}
+};
+
+BoardBackground createBoardBackground(int width, int height, int tileSize, float xBuffer, float yBuffer) {
+    // SFML 3.0: RenderTexture constructor accepts sf::Vector2u
+    sf::Vector2u texSize(
+        static_cast<unsigned int>(width * tileSize),
+        static_cast<unsigned int>(height * tileSize)
+    );
+
+    sf::RenderTexture renderTexture(texSize);
+    renderTexture.clear(sf::Color::Black);
+
+    // Setup cell shape
+    float fTileSize = static_cast<float>(tileSize);
+    sf::RectangleShape cell(sf::Vector2f(fTileSize, fTileSize));
+    cell.setFillColor(sf::Color::Transparent);
+    cell.setOutlineColor(sf::Color(128, 128, 128));
+    cell.setOutlineThickness(-1.f); // Keep outline within cell bounds
+
+    // Render cells onto off-screen target
+    for (int i = 0; i < height; ++i) {
+        for (int j = 0; j < width; ++j) {
+            cell.setPosition(sf::Vector2f(j * fTileSize, i * fTileSize));
+            renderTexture.draw(cell);
+        }
+    }
+
+    renderTexture.display();
+
+    // Construct background wrapper
+    BoardBackground bg(std::move(renderTexture));
+    bg.sprite.setPosition(sf::Vector2f(xBuffer, yBuffer));
+
+    return bg;
+}
+
 void debug(sf::RenderWindow& window, std::string status){
     const sf::Font font("assets/font/times.ttf");
     sf::Text text(font, status);
@@ -99,28 +163,16 @@ void drawPiece(sf::RenderWindow& window, sf::Sprite& sprite, int piece, int rota
     }
 }
 
-void drawBoard(sf::RenderWindow& window, sf::Texture& texture, Board& board, GameSettings settings) {
+void drawBoard(sf::RenderWindow& window, sf::Texture& texture, BoardBackground& boardSprite, Board& board, GameSettings& settings) {
     PieceState currentPiece = board.currentPiece;
     int heldPiece = board.heldPiece;
-    const int tileSize = 32;
-    int xBuffer = 200;
-    int yBuffer = 80;
+    const int tileSize = board.tileSize;
+    int xBuffer = board.xBuffer;
+    int yBuffer = board.yBuffer;
 
     int previewXOffset = xBuffer + (board.width * tileSize) + 20;
 
-    sf::RectangleShape rect({static_cast<float>(tileSize), static_cast<float>(tileSize)});
-    rect.setFillColor(sf::Color::Black);
-    rect.setOutlineColor(sf::Color(128, 128, 128));
-    rect.setOutlineThickness(1.f);
-
-    //Draw the board
-    for (int i = 0; i < board.height; i++) {
-        for (int j = 0; j < board.width; j++) {
-            float screenY = static_cast<float>((board.height - 1 - i) * tileSize + yBuffer);
-            rect.setPosition({static_cast<float>(j * tileSize + xBuffer), screenY});
-            window.draw(rect);
-        }
-    }
+    window.draw(boardSprite.sprite);
 
     //Draw the piece guide
     if (settings.guideEnabled){
@@ -278,23 +330,21 @@ int main() {
     int frameRateRefrence = frameRate;
     window.setFramerateLimit(frameRate);
 
+    Board board(10, 20);
+    FallingState falling;
+
     sf::Texture texture;
     if (!texture.loadFromFile("assets/img/tetrisBlocks.png")) {
         return -1;
     }
 
-    Board board(10, 20);
+    BoardBackground boardBG = createBoardBackground(board.width, board.height, board.tileSize, board.xBuffer, board.yBuffer);
 
     std::vector<int> releaseTimings;
-
-    int maxTimeGrounded = 60;
 
     bool downPressed = false;
     bool displayData = false;
     bool gameOver = false;
-
-    float timeSinceLastDrop = 0;
-    float timeOnGround = 0;
 
     bool showDebug = true;
 
@@ -332,7 +382,7 @@ int main() {
     InputEventQueue inputQueue;
     std::atomic<bool> inputThreadRunning{true};
     const std::vector<KeyBinding>& trackedKeys = data.keyBindings;
-    std::array<bool, 14> previousState{};
+    std::array<bool, 15> previousState{};
 
     std::thread inputThread([&]() {
         while (inputThreadRunning.load()) {
@@ -355,7 +405,7 @@ int main() {
         sf::Time frameTime = fpsClock.restart();
         float frameLength = 1.0f / frameTime.asSeconds();
         frameTimes.push_back(frameLength);
-        if(frameTimes.size() > 10){
+        if(frameTimes.size() > 30){
             float totalFps = 0.f;
             for (const float frameTime : frameTimes) {
                 totalFps += frameTime;
@@ -363,6 +413,7 @@ int main() {
             fps = totalFps / static_cast<float>(frameTimes.size());
             frameTimes.clear();
         }
+        
         while (const std::optional event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
                 window.close();
@@ -387,159 +438,172 @@ int main() {
 
         QueuedInputEvent queuedEvent{};
         while (inputQueue.dequeue(queuedEvent)) {
+            // Still clears the queue when paused
             auto keyPressTime = queuedEvent.timestamp;
-            if (queuedEvent.pressed) {
-                // Move Right
-                if (queuedEvent.key == data.keyBindings[0].key) {
-                    if (!moveRightState.isPressed) {
-                        moveRightState.press(keyPressTime);
-                        moveLeftState.release();
-                        board.movePiece(board.currentPiece, 1);
+            // Puase board
+            if (queuedEvent.pressed && queuedEvent.key == data.keyBindings[14].key) {
+                board.running = !board.running;
+            }
+            if (board.running) {
+                if (queuedEvent.pressed) {
+                    // Move Right
+                    if (queuedEvent.key == data.keyBindings[0].key) {
+                        if (!moveRightState.isPressed) {
+                            moveRightState.press(keyPressTime);
+                            moveLeftState.release();
+                            board.movePiece(board.currentPiece, 1);
+                        }
                     }
-                }
 
-                // Move Left
-                if (queuedEvent.key == data.keyBindings[1].key) {
-                    if (!moveLeftState.isPressed) {
-                        moveLeftState.press(keyPressTime);
+                    // Move Left
+                    if (queuedEvent.key == data.keyBindings[1].key) {
+                        if (!moveLeftState.isPressed) {
+                            moveLeftState.press(keyPressTime);
+                            moveRightState.release();
+                            board.movePiece(board.currentPiece, -1);
+                        }
+                    }
+
+                    // Rotate Clockwise
+                    if (queuedEvent.key == data.keyBindings[2].key) {
+                        board.rotatePiece(board.currentPiece, 1);
+                        if(board.currentPiece.grounded) falling.rotate();
+                    }
+
+                    // Rotate Counter-Clockwise
+                    if (queuedEvent.key == data.keyBindings[3].key) {
+                        board.rotatePiece(board.currentPiece, -1);
+                        if(board.currentPiece.grounded) falling.rotate();
+                    }
+
+                    // Rotate 180
+                    if (queuedEvent.key == data.keyBindings[4].key) {
+                        board.rotatePiece(board.currentPiece, 2);
+                        if(board.currentPiece.grounded) falling.rotate();
+                    }
+
+                    // Hold Piece
+                    if (queuedEvent.key == data.keyBindings[5].key) {
+                        board.holdPiece(board.currentPiece);
+                        falling.reset();
+                    }
+
+                    // Hard Drop
+                    if (queuedEvent.key == data.keyBindings[6].key) {
+                        for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
+                        if(!board.placePiece(board.currentPiece)) gameOver = true;
+                        falling.reset();
+                    }
+
+                    // Soft Drop
+                    if (queuedEvent.key == data.keyBindings[7].key) {
+                        for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
+                        board.currentPiece.grounded = true;
+                        downPressed = true;
+                    }
+
+                    // Reset Game
+                    if (queuedEvent.key == data.keyBindings[8].key) {
+                        board.resetGame(10, 20);
+                        board.held = false;
+                        falling.reset();
+                    }
+
+                    // Toggle Statistics
+                    if (queuedEvent.key == data.keyBindings[9].key) {
+                        displayData = !displayData;
+                    }
+
+                    // Toggle Debug Info
+                    if (queuedEvent.key == data.keyBindings[10].key) {
+                        showDebug = !showDebug;
+                    }
+
+                    // Exit Game
+                    if (queuedEvent.key == data.keyBindings[11].key) {
+                        window.close();
+                    }
+
+                    // Toggle Guide
+                    if (queuedEvent.key == data.keyBindings[12].key) {
+                        data.guideEnabled = !data.guideEnabled;
+                    }
+
+                    // Undo move
+                    if (queuedEvent.key == data.keyBindings[13].key) {
+                        board.undoPiece();
+                        falling.timeOnGround = 0;
+                        falling.timeSinceLastDrop = 0;
+                    }
+
+                } else {
+                    // Released Move Right
+                    if (queuedEvent.key == data.keyBindings[0].key) {
+                        board.updatePiecePosition(board.currentPiece, &moveRightState, keyPressTime);
+                        releaseTimings.push_back(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(keyPressTime - moveRightState.startTime).count()));
                         moveRightState.release();
-                        board.movePiece(board.currentPiece, -1);
-                    }
+                    };
+
+                    // Released Move Left
+                    if (queuedEvent.key == data.keyBindings[1].key) {
+                        board.updatePiecePosition(board.currentPiece, &moveLeftState, keyPressTime);
+                        releaseTimings.push_back(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(keyPressTime - moveRightState.startTime).count()));
+                        moveLeftState.release();
+                    };
+
+                    // Released Soft Drop
+                    if (queuedEvent.key == data.keyBindings[7].key) downPressed = false;
                 }
-
-                // Rotate Clockwise
-                if (queuedEvent.key == data.keyBindings[2].key) {
-                    board.rotatePiece(board.currentPiece, 1);
-                }
-
-                // Rotate Counter-Clockwise
-                if (queuedEvent.key == data.keyBindings[3].key) {
-                    board.rotatePiece(board.currentPiece, -1);
-                }
-
-                // Rotate 180
-                if (queuedEvent.key == data.keyBindings[4].key) {
-                    board.rotatePiece(board.currentPiece, 2);
-                }
-
-                // Hold Piece
-                if (queuedEvent.key == data.keyBindings[5].key) {
-                    board.holdPiece(board.currentPiece);
-                    timeOnGround = 0;
-                    timeSinceLastDrop = 0;
-                }
-
-                // Hard Drop
-                if (queuedEvent.key == data.keyBindings[6].key) {
-                    for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
-                    if(!board.placePiece(board.currentPiece)) gameOver = true;
-                    timeOnGround = 0;
-                    timeSinceLastDrop = 0;
-                }
-
-                // Soft Drop
-                if (queuedEvent.key == data.keyBindings[7].key) {
-                    for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
-                    board.currentPiece.grounded = true;
-                    downPressed = true;
-                }
-
-                // Reset Game
-                if (queuedEvent.key == data.keyBindings[8].key) {
-                    board.resetGame(10, 20);
-                    board.held = false;
-                    timeOnGround = 0;
-                    timeSinceLastDrop = 0;
-                }
-
-                // Toggle Statistics
-                if (queuedEvent.key == data.keyBindings[9].key) {
-                    displayData = !displayData;
-                }
-
-                // Toggle Debug Info
-                if (queuedEvent.key == data.keyBindings[10].key) {
-                    showDebug = !showDebug;
-                }
-
-                // Exit Game
-                if (queuedEvent.key == data.keyBindings[11].key) {
-                    window.close();
-                }
-
-                // Toggle Guide
-                if (queuedEvent.key == data.keyBindings[12].key) {
-                    data.guideEnabled = !data.guideEnabled;
-                }
-
-                // Undo move
-                if (queuedEvent.key == data.keyBindings[13].key) {
-                    board.undoPiece();
-                    timeOnGround = 0;
-                    timeSinceLastDrop = 0;
-                }
-            } else {
-                // Released Move Right
-                if (queuedEvent.key == data.keyBindings[0].key) {
-                    board.updatePiecePosition(board.currentPiece, &moveRightState, keyPressTime);
-                    releaseTimings.push_back(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(keyPressTime - moveRightState.startTime).count()));
-                    moveRightState.release();
-                };
-
-                // Released Move Left
-                if (queuedEvent.key == data.keyBindings[1].key) {
-                    board.updatePiecePosition(board.currentPiece, &moveLeftState, keyPressTime);
-                    releaseTimings.push_back(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(keyPressTime - moveRightState.startTime).count()));
-                    moveLeftState.release();
-                };
-
-                // Released Soft Drop
-                if (queuedEvent.key == data.keyBindings[7].key) downPressed = false;
             }
         }
-
-        board.updatePiecePosition(board.currentPiece, &moveRightState, std::chrono::high_resolution_clock::now());
-        board.updatePiecePosition(board.currentPiece, &moveLeftState, std::chrono::high_resolution_clock::now());
 
         window.clear(sf::Color(30, 30, 30));
 
-        if(downPressed){
-            for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
-            board.currentPiece.grounded = true;
-        }
-        
-        
-        if(board.currentPiece.grounded){
-            // Check if piece is still not grounded
-            if(!board.validPosition(board.currentPiece, -1)){
-                timeOnGround += 60/frameLength;
-                if(timeOnGround >= maxTimeGrounded){
-                    if(!board.placePiece(board.currentPiece)) gameOver = true;
-                    timeOnGround = 0;
-                    timeSinceLastDrop = 0;
-                }
-            } else board.currentPiece.grounded = false;
-        } else {
-            timeSinceLastDrop += 60/frameLength;
-            if(timeSinceLastDrop > 60) {
-                board.currentPiece.y--;
-                if(!board.validPosition(board.currentPiece, -1)){
-                    board.currentPiece.grounded = true;
-                }
-                timeSinceLastDrop = 0;
+        if (board.running) {
+            board.updatePiecePosition(board.currentPiece, &moveRightState, std::chrono::high_resolution_clock::now());
+            board.updatePiecePosition(board.currentPiece, &moveLeftState, std::chrono::high_resolution_clock::now());
+
+            if(downPressed){
+                for(;board.validPosition(board.currentPiece, -1);board.currentPiece.y--);
+                board.currentPiece.grounded = true;
             }
-        }
+            
+            if(board.currentPiece.grounded){
+                // Check if piece is still not grounded
+                if(!board.validPosition(board.currentPiece, -1)){
+                    falling.timeOnGround += 60/frameLength;
+                    if(falling.timeOnGround >= falling.maxTimeGrounded){
+                        if(!board.placePiece(board.currentPiece)) gameOver = true;
+                        falling.reset();
+                    }
+                } else board.currentPiece.grounded = false;
+            } else {
+                falling.timeSinceLastDrop += 60/frameLength;
+                if(falling.timeSinceLastDrop > 60) {
+                    board.currentPiece.y--;
+                    if(!board.validPosition(board.currentPiece, -1)){
+                        board.currentPiece.grounded = true;
+                    }
+                    falling.timeSinceLastDrop = 0;
+                }
+            }
 
-        if(DASint != DAS_DELAY.count()){
-            DAS_DELAY = std::chrono::milliseconds(DASint);
-            moveLeftState.DAS_DELAY = DAS_DELAY;
-            moveRightState.DAS_DELAY = DAS_DELAY;
-        }
+            if(DASint != DAS_DELAY.count()){
+                DAS_DELAY = std::chrono::milliseconds(DASint);
+                moveLeftState.DAS_DELAY = DAS_DELAY;
+                moveRightState.DAS_DELAY = DAS_DELAY;
+            }
 
-        if(ARRint != ARR_INTERVAL.count()){
-            ARR_INTERVAL = std::chrono::milliseconds(ARRint);
-            moveLeftState.ARR_INTERVAL = ARR_INTERVAL;
-            moveRightState.ARR_INTERVAL = ARR_INTERVAL;
+            if(ARRint != ARR_INTERVAL.count()){
+                ARR_INTERVAL = std::chrono::milliseconds(ARRint);
+                moveLeftState.ARR_INTERVAL = ARR_INTERVAL;
+                moveRightState.ARR_INTERVAL = ARR_INTERVAL;
+            }
+
+            if(gameOver){
+                board.resetGame(board.width, board.height);
+                gameOver = false;
+            }
         }
 
         if(frameRateRefrence != frameRate){
@@ -547,29 +611,22 @@ int main() {
             frameRateRefrence = frameRate;
         }
 
-        if(gameOver){
-            board.resetGame(board.width, board.height);
-            gameOver = false;
-        }
-
         if(showDebug) {
             std::string status = "FPS: " + std::to_string(static_cast<int>(fps)) + 
                                     " | Piece X: " + std::to_string(board.currentPiece.x) + 
                                     ", Piece Y: " + std::to_string(board.currentPiece.y) +
-                                    ", Grounded: " + std::to_string(board.currentPiece.grounded);
+                                    ", Max Time Grounded: " + std::to_string(falling.maxTimeGrounded);
             debug(window, status);
         }
 
         if(displayData) {
             drawHistogram(window, releaseTimings, 3*DAS_DELAY.count());
         } else {
-            drawBoard(window, texture, board, data);
+            drawBoard(window, texture, boardBG, board, data);
         }
 
         window.draw(toggleBtn);
         menu.draw(window);
-
-        
 
         window.display();
     }

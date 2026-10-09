@@ -54,6 +54,12 @@ struct Board {
     int piecesPlaced = 0;
     bool held = false;
     Guide guide;
+    bool running = true;
+
+    // Rendering stuff
+    const int tileSize = 32;
+    int xBuffer = 200;
+    int yBuffer = 80;
 
     int generateNextPiece() {
         if (pieceBag.empty()) {
@@ -187,6 +193,7 @@ struct Board {
         height = h;
         grid.clear();
         grid.assign(h+5, std::vector<int>(w, 0));
+        while(!moveHistory.empty()) moveHistory.pop(); //maybe refactor to something else so can use .clear() IDK thou?
     }
 
     void resetGame(int w, int h) {
@@ -214,7 +221,6 @@ struct Board {
                 }
             }
             if (isFull) {
-                // Same line for all lines cleared, sometimes??? not t-spin but tetris????
                 std::vector<int> clearedLine = *(grid.begin() + i);
                 grid.erase(grid.begin() + i);
                 grid.insert(grid.begin() + (height + 4), std::vector<int>(width, 0));
