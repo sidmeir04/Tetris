@@ -1,8 +1,5 @@
-#ifndef PIECES_H
-#define PIECES_H
+#include "piece/Pieces.hpp"
 
-#include "pieceState.h"
-#include <vector>
 // I = 5
 // Square = 4
 // T = 7
@@ -10,6 +7,7 @@
 // J = 6
 // S = 1
 // Z = 3
+namespace {
 std::vector<std::vector<std::vector<std::vector<int>>>> pieces = {
     //Line
     {
@@ -229,9 +227,8 @@ std::vector<std::vector<std::vector<std::vector<int>>>> pieces = {
         }
     }
 };
-
-std::vector<std::vector<int>> getPiece(PieceState currentPiece){
-    return pieces[currentPiece.piece][currentPiece.rotation];
 }
 
-#endif
+std::vector<std::vector<int>> getPiece(PieceState currentPiece) {
+    return pieces[currentPiece.piece][currentPiece.rotation];
+}

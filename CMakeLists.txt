@@ -10,24 +10,31 @@ list(APPEND CMAKE_PREFIX_PATH "C:/msys64/ucrt64")
 find_package(SFML 3 COMPONENTS Graphics Window System REQUIRED)
 find_package(Boost REQUIRED CONFIG)
 
-# 2. Automatically find all .cpp files in the src directory
-file(GLOB_RECURSE SOURCES "src/*.cpp")
+set(SOURCES
+    src/main.cpp
+    src/app/Game.cpp
+    src/board/Bag.cpp
+    src/board/Board.cpp
+    src/guide/Guide.cpp
+    src/guide/GuidePatterns.cpp
+    src/input/InputThread.cpp
+    src/piece/Pieces.cpp
+    src/piece/Srs.cpp
+    src/render/BoardBackground.cpp
+    src/render/BoardRenderer.cpp
+    src/render/DebugOverlay.cpp
+    src/render/Histogram.cpp
+    src/settings/SettingsUI.cpp
+)
 
-# 3. Create the executable using the found source files
-add_executable(Tetris ${SOURCES}
-    headers/SettingsUI.hpp)
+add_executable(Tetris ${SOURCES})
 
-# Copy assets folder to build directory
 add_custom_command(TARGET Tetris POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/assets
     $<CONFIG>/assets
     COMMENT "Copying assets folder")
-    
-# 4. Tell the compiler where the .hpp files are 
-# (This allows you to write #include "Game.hpp" without paths)
-target_include_directories(Tetris PRIVATE headers)
-target_link_libraries(Tetris PRIVATE Boost::boost)
 
-# 5. Link SFML
+target_include_directories(Tetris PRIVATE src)
+target_link_libraries(Tetris PRIVATE Boost::boost)
 target_link_libraries(Tetris PRIVATE SFML::Graphics SFML::Window SFML::System)

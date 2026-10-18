@@ -1,5 +1,5 @@
-#ifndef PIECE_HANDLING
-#define PIECE_HANDLING
+#ifndef INPUT_STATE_HPP
+#define INPUT_STATE_HPP
 
 #include <chrono>
 
@@ -15,14 +15,14 @@ struct InputState {
     InputState(std::chrono::milliseconds das, std::chrono::milliseconds arr, int move)
         : DAS_DELAY(das), ARR_INTERVAL(arr), movement(move) {}
 
-    void press(const std::chrono::time_point<std::chrono::high_resolution_clock>& now){
+    void press(const std::chrono::time_point<std::chrono::high_resolution_clock>& now) {
         isPressed = true;
         dasTriggered = false;
         startTime = now;
         lastRepeat = now;
     }
 
-    void release(){
+    void release() {
         isPressed = false;
         dasTriggered = false;
     }
