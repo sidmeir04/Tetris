@@ -13,7 +13,6 @@ find_package(Boost REQUIRED CONFIG)
 set(SOURCES
     src/main.cpp
     src/app/Game.cpp
-    src/board/Bag.cpp
     src/board/Board.cpp
     src/guide/Guide.cpp
     src/guide/GuidePatterns.cpp
@@ -25,6 +24,7 @@ set(SOURCES
     src/render/DebugOverlay.cpp
     src/render/Histogram.cpp
     src/settings/SettingsUI.cpp
+    src/utility/CanPlace.cpp
 )
 
 add_executable(Tetris ${SOURCES})
