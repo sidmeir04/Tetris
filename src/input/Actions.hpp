@@ -16,7 +16,7 @@ enum class GameplayAction {
     Count
 };
 
-enum class MenuAction {
+enum class NonGameplayAction {
     ResetGame = 0,
     ToggleStatistics,
     ToggleDebugInfo,
@@ -30,8 +30,8 @@ inline constexpr std::size_t gameplayActionCount() {
     return static_cast<std::size_t>(GameplayAction::Count);
 }
 
-inline constexpr std::size_t menuActionCount() {
-    return static_cast<std::size_t>(MenuAction::Count);
+inline constexpr std::size_t nonGameplayActionCount() {
+    return static_cast<std::size_t>(NonGameplayAction::Count);
 }
 
 #endif

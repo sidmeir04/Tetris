@@ -10,6 +10,7 @@
 #include "render/BoardBackground.hpp"
 #include "settings/GameSettings.hpp"
 #include "settings/SettingsUI.hpp"
+#include "utility/CanPlace.hpp"
 
 #include <SFML/Graphics.hpp>
 #include <chrono>
@@ -45,7 +46,13 @@ public:
     bool gameOver = false;
     bool showDebug = true;
 
-    InputEventQueue inputQueue;
+    bool showPossibleMoves = true;
+    int timeToCycle = 0;
+    int possibleMovePos = 1;
+    PieceState originalPieceState;
+    std::vector<Position> possibleMoves;
+
+    GameplayInputBuffer gameplayInputBuffer;
     InputThread inputThread;
     std::set<sf::Keyboard::Key> nonGameplayKeysDown;
 
@@ -56,7 +63,7 @@ public:
 
     void setupSettingsMenu();
     void handleWindowEvent(sf::RenderWindow& window, const sf::Event& event);
-    void processInputQueue();
+    void processGameplayInputBuffer();
     void update(float frameLength);
     void applySettings(sf::RenderWindow& window);
     void draw(sf::RenderWindow& window);
@@ -65,7 +72,7 @@ public:
 private:
     void handlePressedAction(GameplayAction action, std::chrono::time_point<std::chrono::high_resolution_clock> keyPressTime);
     void handleReleasedAction(GameplayAction action, std::chrono::time_point<std::chrono::high_resolution_clock> keyPressTime);
-    void handleMenuAction(MenuAction action, sf::RenderWindow& window);
+    void handleNonGameplayAction(NonGameplayAction action, sf::RenderWindow& window);
     void updateFalling(float frameLength);
 };
 

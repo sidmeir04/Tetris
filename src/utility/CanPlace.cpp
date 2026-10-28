@@ -1,45 +1,100 @@
+#include "utility/canPlace.hpp"
 #include "board/Board.hpp"
 #include "piece/PieceState.hpp"
 #include "piece/Pieces.hpp"
 
 #include <string>
 #include <vector>
+#include <deque>
+#include <iostream>
 
-std::vector<Position> getPossiblePlacements(Board& board, PieceState& piece) {
-    std::vector<Position> possiblePlacements;
+bool possiblePlacement(Board& board, PieceState& currentPiece, Position targetPosition) {
+    VisitedTracker visited(board.width, board.height);
+    std::deque<Position> reachable;
+    reachable.push_front(currentPiece.getPosition());
+    visited.markVisited(currentPiece.getPosition());
 
-    for(int i = 0; i < board.height + 5; i++){
-        for(int j = 0; j < board.width; j++){
-            for(int r  = 0; r < 4; r++){
-                // Loop through allk possible possitions and rotations
-                if(!board.validPosition(piece)) continue; // Invalid position
-                if(board.validPosition(piece, -1)) continue; // Floating in mid air
-
-                if(i<=piece.y){ // Check if can move and hard drop
-                    PieceState temp = piece;
-                    while (temp.rotation != r) {
-                        temp.rotation++;
-                        if(!board.validPosition(temp)) continue;
-                    }
-                    if(piece.x < j){
-                        for(int x = piece.x; piece.x < j; temp.x++) {
-                            if(!board.validPosition(temp)) continue;
-                        }
-                    }
-                    else {
-                        for(int x = piece.x; piece.x < j; temp.x--) {
-                            if(!board.validPosition(temp)) continue;
-                        }
-                    }
-                    for(int y_off; j+y_off > piece.y; y_off--) {
-                        if (!board.validPosition(temp, y_off)) continue;
-                    }
+    PieceState originalPieceState = currentPiece;
+    while(!reachable.empty()) {
+        Position current = reachable.front();
+        reachable.pop_front();
+        for(int i = 0; i < 6; i++){
+            currentPiece.updatePosition(current);
+            switch (i) {
+                case 0:
+                    board.rotatePiece(currentPiece, -1);
+                    break;
+                case 1:
+                    board.rotatePiece(currentPiece, 1);
+                    break;
+                case 2:
+                    board.rotatePiece(currentPiece, 2);
+                    break;
+                case 3:
+                    board.movePiece(currentPiece, 1);
+                    break;
+                case 4:
+                    board.movePiece(currentPiece, -1);
+                    break;
+                case 5:
+                    if(board.validPosition(currentPiece, -1))currentPiece.y--;
+                    break;
+            }
+            if(!visited.hasBeenReached(currentPiece.getPosition())) {
+                if(currentPiece.getPosition() == targetPosition) {
+                    if(board.validPosition(currentPiece, -1)) return false;
+                    else return true;
                 }
-
-
+                reachable.push_front(currentPiece.getPosition());
+                visited.markVisited(currentPiece.getPosition());
             }
         }
     }
+    return false;
+}
 
+std::vector<Position> getPossiblePlacements(Board& board, PieceState& currentPiece) {
+    int count = 0;
+    std::vector<Position> possiblePlacements;
+    VisitedTracker visited(board.width, board.height);
+    std::deque<Position> reachable;
+    reachable.push_front(currentPiece.getPosition());
+    visited.markVisited(currentPiece.getPosition());
+
+    PieceState originalPieceState = currentPiece;
+    while(!reachable.empty()) {
+        Position current = reachable.front();
+        reachable.pop_front();
+        for(int i = 0; i < 6; i++){
+            count++;
+            currentPiece.updatePosition(current);
+            switch (i) {
+                case 0:
+                    board.rotatePiece(currentPiece, -1);
+                    break;
+                case 1:
+                    board.rotatePiece(currentPiece, 1);
+                    break;
+                case 2:
+                    board.rotatePiece(currentPiece, 2);
+                    break;
+                case 3:
+                    board.movePiece(currentPiece, 1);
+                    break;
+                case 4:
+                    board.movePiece(currentPiece, -1);
+                    break;
+                case 5:
+                    if(board.validPosition(currentPiece, -1))currentPiece.y--;
+                    break;
+            }
+            if(!visited.hasBeenReached(currentPiece.getPosition())) {
+                reachable.push_front(currentPiece.getPosition());
+                visited.markVisited(currentPiece.getPosition());
+                if(!board.validPosition(currentPiece, -1)) possiblePlacements.push_back(currentPiece.getPosition());
+            }
+        }
+    }
+    std::cout << count;
     return possiblePlacements;
 }

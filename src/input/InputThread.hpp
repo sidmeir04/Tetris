@@ -9,14 +9,14 @@
 #include <vector>
 
 class InputThread {
-    InputEventQueue& queue;
-    const std::vector<KeyBinding>& trackedKeys;
+    GameplayInputBuffer& gameplayInputBuffer;
+    const std::vector<KeyBinding>& gameplayBindings;
     std::atomic<bool> running{true};
     std::vector<char> previousState;
     std::thread thread;
 
 public:
-    InputThread(InputEventQueue& queue, const std::vector<KeyBinding>& trackedKeys);
+    InputThread(GameplayInputBuffer& gameplayInputBuffer, const std::vector<KeyBinding>& gameplayBindings);
     ~InputThread();
 
     InputThread(const InputThread&) = delete;

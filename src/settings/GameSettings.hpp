@@ -23,7 +23,7 @@ struct GameSettings {
         {"Undo", 'Z', sf::Keyboard::Key::Z},
     };
 
-    std::vector<KeyBinding> menuBindings = {
+    std::vector<KeyBinding> nonGameplayBindings = {
         {"Reset Game", 'R', sf::Keyboard::Key::R},
         {"Toggle Statistics", 'I', sf::Keyboard::Key::I},
         {"Toggle Debug Info", VK_F8, sf::Keyboard::Key::F8},
@@ -36,8 +36,8 @@ struct GameSettings {
         return static_cast<GameplayAction>(index);
     }
 
-    MenuAction menuActionAt(std::size_t index) const {
-        return static_cast<MenuAction>(index);
+    NonGameplayAction nonGameplayActionAt(std::size_t index) const {
+        return static_cast<NonGameplayAction>(index);
     }
 };
 

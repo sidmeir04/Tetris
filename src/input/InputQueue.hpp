@@ -7,20 +7,20 @@
 #include <chrono>
 #include <mutex>
 
-struct QueuedInputEvent {
+struct GameplayInputEvent {
     GameplayAction action;
     bool pressed;
     std::chrono::time_point<std::chrono::high_resolution_clock> timestamp;
 };
 
-struct InputEventQueue {
+struct GameplayInputBuffer {
     static constexpr std::size_t CAPACITY = 13;
-    std::array<QueuedInputEvent, CAPACITY> events{};
+    std::array<GameplayInputEvent, CAPACITY> events{};
     std::size_t head = 0;
     std::size_t size = 0;
     std::mutex mutex;
 
-    void enqueue(const QueuedInputEvent& event) {
+    void enqueue(const GameplayInputEvent& event) {
         std::lock_guard<std::mutex> lock(mutex);
         if (size < CAPACITY) {
             events[(head + size) % CAPACITY] = event;
@@ -31,7 +31,7 @@ struct InputEventQueue {
         head = (head + 1) % CAPACITY;
     }
 
-    bool dequeue(QueuedInputEvent& event) {
+    bool dequeue(GameplayInputEvent& event) {
         std::lock_guard<std::mutex> lock(mutex);
         if (size == 0) {
             return false;

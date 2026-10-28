@@ -24,7 +24,7 @@ int main() {
             game.handleWindowEvent(window, *event);
         }
 
-        game.processInputQueue();
+        game.processGameplayInputBuffer();
         window.clear(sf::Color(30, 30, 30));
         game.update(frameLength);
         game.applySettings(window);

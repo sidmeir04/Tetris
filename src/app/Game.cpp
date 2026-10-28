@@ -4,6 +4,7 @@
 #include "render/BoardRenderer.hpp"
 #include "render/DebugOverlay.hpp"
 #include "render/Histogram.hpp"
+#include "utility/CanPlace.hpp"
 
 #include <memory>
 
@@ -13,7 +14,7 @@ Game::Game(sf::Texture loadedTexture)
       moveRightState(DAS_DELAY, ARR_INTERVAL, 1),
       texture(std::move(loadedTexture)),
       boardBG(createBoardBackground(board.width, board.height, board.tileSize, board.xBuffer, board.yBuffer)),
-      inputThread(inputQueue, settings.gameplayBindings) {
+    inputThread(gameplayInputBuffer, settings.gameplayBindings) {
     toggleBtn.setSize({110, 40});
     toggleBtn.setPosition({680, 10});
     toggleBtn.setFillColor(sf::Color::Blue);
@@ -38,7 +39,7 @@ void Game::setupSettingsMenu() {
 
     SettingsPage menuControls;
     y = 100.f;
-    for (auto& binding : settings.menuBindings) {
+    for (auto& binding : settings.nonGameplayBindings) {
         menuControls.addElement(std::make_unique<KeyBinder>(
             menu.getFont(), binding.action, sf::Vector2f{150, y}, binding));
         y += 50.f;
@@ -60,9 +61,9 @@ void Game::handleWindowEvent(sf::RenderWindow& window, const sf::Event& event) {
 
     if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>()) {
         if (nonGameplayKeysDown.insert(keyPressed->code).second) {
-            for (std::size_t i = 0; i < settings.menuBindings.size(); ++i) {
-                if (keyPressed->code == settings.menuBindings[i].key) {
-                    handleMenuAction(settings.menuActionAt(i), window);
+            for (std::size_t i = 0; i < settings.nonGameplayBindings.size(); ++i) {
+                if (keyPressed->code == settings.nonGameplayBindings[i].key) {
+                    handleNonGameplayAction(settings.nonGameplayActionAt(i), window);
                 }
             }
         }
@@ -155,18 +156,18 @@ void Game::handleReleasedAction(GameplayAction action, std::chrono::time_point<s
     }
 }
 
-void Game::processInputQueue() {
-    QueuedInputEvent queuedEvent{};
-    while (inputQueue.dequeue(queuedEvent)) {
+void Game::processGameplayInputBuffer() {
+    GameplayInputEvent queuedEvent{};
+    while (gameplayInputBuffer.dequeue(queuedEvent)) {
         if (!board.running) continue;
         if (queuedEvent.pressed) handlePressedAction(queuedEvent.action, queuedEvent.timestamp);
         else handleReleasedAction(queuedEvent.action, queuedEvent.timestamp);
     }
 }
 
-void Game::handleMenuAction(MenuAction action, sf::RenderWindow& window) {
+void Game::handleNonGameplayAction(NonGameplayAction action, sf::RenderWindow& window) {
     switch (action) {
-        case MenuAction::ResetGame:
+        case NonGameplayAction::ResetGame:
             board.resetGame(10, 20);
             board.held = false;
             gameOver = false;
@@ -175,25 +176,31 @@ void Game::handleMenuAction(MenuAction action, sf::RenderWindow& window) {
             moveRightState.release();
             downPressed = false;
             break;
-        case MenuAction::ToggleStatistics:
+        case NonGameplayAction::ToggleStatistics:
             displayData = !displayData;
             break;
-        case MenuAction::ToggleDebugInfo:
+        case NonGameplayAction::ToggleDebugInfo:
             showDebug = !showDebug;
             break;
-        case MenuAction::ExitGame:
+        case NonGameplayAction::ExitGame:
             window.close();
             break;
-        case MenuAction::ToggleGuide:
+        case NonGameplayAction::ToggleGuide:
             settings.guideEnabled = !settings.guideEnabled;
             break;
-        case MenuAction::PauseGame:
+        case NonGameplayAction::PauseGame:
             board.running = !board.running;
             moveLeftState.release();
             moveRightState.release();
             downPressed = false;
+            if (board.running) {
+                board.currentPiece = originalPieceState;
+            } else {
+                originalPieceState = board.currentPiece;
+                possibleMoves = getPossiblePlacements(board, board.currentPiece);
+            }
             break;
-        case MenuAction::Count:
+        case NonGameplayAction::Count:
             break;
     }
 }
@@ -246,6 +253,14 @@ void Game::update(float frameLength) {
         if (gameOver) {
             board.resetGame(board.width, board.height);
             gameOver = false;
+        }
+    } else if (showPossibleMoves && !possibleMoves.empty()) { // Cycle through possible moves for debugging
+        timeToCycle++;
+        if(timeToCycle >= 60) {
+            timeToCycle = 0;
+            possibleMovePos = (possibleMovePos+1) % possibleMoves.size();
+            Position position = possibleMoves[possibleMovePos];
+            board.currentPiece.reset(position.piece, position.rotation, position.x, position.y, false);
         }
     }
 }
