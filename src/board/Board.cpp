@@ -13,7 +13,7 @@ Board::Board(int w, int h)
       gen(static_cast<unsigned int>(
           std::chrono::system_clock::now().time_since_epoch().count())),
       currentPiece(0, 0, 0, 0, false),
-      guide(SDPCguide1, "Single Double PC") {
+      guide("SDPC") {
     currentPiece = PieceState(getNextPiece(), 0, 3, height - 1, false);
     for (int i = 0; i < 6; i++) {
         pieceQueue.push_back(generateNextPiece());
@@ -101,7 +101,7 @@ std::vector<int> Board::clearLines() {
         }
     }
 
-    guide.clearLines(linesCleared, piecesPlaced);
+    guide.clearLines(linesCleared);
     currentMove.lineIndexes = linesCleared;
     currentMove.linesCleared = true;
 
@@ -109,6 +109,7 @@ std::vector<int> Board::clearLines() {
 }
 
 bool Board::placePiece(const PieceState& state) {
+    piecesPlaced++;
     std::vector<std::vector<int>> piece = getPiece(state);
     int x;
     int gridRow;
@@ -129,8 +130,8 @@ bool Board::placePiece(const PieceState& state) {
     currentMove.reset();
     currentPiece.reset(getNextPiece(), 0, 3, height + 2, false);
     held = false;
+    guide.placeBlock();
     if (!validPosition(currentPiece, -1)) currentPiece.grounded = true;
-    piecesPlaced++;
     if (!validPosition(currentPiece)) return false;
     return true;
 }
@@ -160,17 +161,27 @@ void Board::undoPiece() {
         }
     }
     pieceQueue.push_front(currentPiece.piece);
+    if(held) {
+        held = false;
+        holdPiece(currentPiece);
+    }
     if (!lastMove.held) {
         currentPiece.reset(lastMove.placedPiece.piece, 0, 3, height + 2, false);
-        held = false;
     } else if (lastMove.heldPiece == -1) {
+        pieceQueue.push_front(heldPiece);
         heldPiece = -1;
         currentPiece.reset(lastMove.placedPiece.piece, 0, 3, height + 2, false);
+        int temp = currentPiece.piece;
+        currentPiece.piece = pieceQueue.front();
+        pieceQueue.pop_front();
+        pieceQueue.push_front(temp);
     } else {
         heldPiece = lastMove.placedPiece.piece;
         currentPiece.reset(lastMove.heldPiece, 0, 3, height + 2, false);
     }
+    piecesPlaced--;
     held = false;
+    guide.undoBlock();
     currentMove.reset();
     moveHistory.pop();
 }
@@ -183,7 +194,7 @@ void Board::movePiece(PieceState& currentPiece, int movement) {
             currentPiece.x -= sign;
         }
     }
-    if (validPosition({currentPiece.piece, currentPiece.rotation, currentPiece.x, currentPiece.y - 1})) currentPiece.grounded = false;
+    if (validPosition(currentPiece, -1)) currentPiece.grounded = false;
 }
 
 void Board::updatePiecePosition(PieceState& currentPiece, InputState* input, std::chrono::time_point<std::chrono::high_resolution_clock> time) {
@@ -236,5 +247,5 @@ void Board::holdPiece(PieceState& currentPiece) {
 }
 
 std::vector<std::vector<int>> Board::getGuideBlock() {
-    return guide.getGuideBlocks(piecesPlaced);
+    return guide.getGuideBlocks();
 }

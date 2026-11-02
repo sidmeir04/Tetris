@@ -186,7 +186,7 @@ void Game::handleNonGameplayAction(NonGameplayAction action, sf::RenderWindow& w
             window.close();
             break;
         case NonGameplayAction::ToggleGuide:
-            settings.guideEnabled = !settings.guideEnabled;
+            board.guide.active = !board.guide.active;
             break;
         case NonGameplayAction::PauseGame:
             board.running = !board.running;

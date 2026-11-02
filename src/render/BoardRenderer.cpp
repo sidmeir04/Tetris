@@ -33,7 +33,7 @@ void drawBoard(sf::RenderWindow& window, sf::Texture& texture, BoardBackground& 
 
     window.draw(boardSprite.sprite);
 
-    if (settings.guideEnabled) {
+    if (board.guide.active) {
         sf::Sprite guideBlock(texture);
         guideBlock.setColor(sf::Color(255, 255, 255, 75));
         std::vector<std::vector<int>> guideBlocks = board.getGuideBlock();

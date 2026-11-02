@@ -9,7 +9,6 @@
 struct GameSettings {
     float masterVolume = 80.f;
     bool vSync = true;
-    bool guideEnabled = false;
 
     std::vector<KeyBinding> gameplayBindings = {
         {"Move Right", 'L', sf::Keyboard::Key::L},

@@ -18,7 +18,7 @@ std::vector<std::vector<int>> SDPCguide2 = {
     {5,0,0,0,0,0,0,0,0,0}
 };
 
-std::vector<std::vector<int>> new_DT_cannon1 = {
+std::vector<std::vector<int>> DT_cannon1 = {
     {4,4,0,2,2,2,5,6,6,6},
     {4,4,0,3,3,2,5,6,1,1},
     {0,0,0,0,3,3,5,1,1,0},
@@ -26,7 +26,7 @@ std::vector<std::vector<int>> new_DT_cannon1 = {
     {0,0,0,0,7,0,0,0,0,0}
 };
 
-std::vector<std::vector<int>> new_DT_cannon2 = {
+std::vector<std::vector<int>> DT_cannon2 = {
     {0,0,0,0,0,0,0,0,0,0},
     {0,0,7,0,0,0,0,0,0,0},
     {6,7,7,7,0,0,0,0,0,5},
@@ -36,7 +36,7 @@ std::vector<std::vector<int>> new_DT_cannon2 = {
     {0,0,2,2,3,0,0,1,0,0}
 };
 
-std::vector<std::vector<int>> new_DT_cannon3 = {
+std::vector<std::vector<int>> DT_cannon3 = {
     {0,0,7,0,0,0,0,0,0,0},
     {0,7,7,0,0,0,0,0,0,0},
     {0,0,7,0,0,0,0,0,0,0},

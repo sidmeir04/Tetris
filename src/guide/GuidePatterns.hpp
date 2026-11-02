@@ -5,8 +5,8 @@
 
 extern std::vector<std::vector<int>> SDPCguide1;
 extern std::vector<std::vector<int>> SDPCguide2;
-extern std::vector<std::vector<int>> new_DT_cannon1;
-extern std::vector<std::vector<int>> new_DT_cannon2;
-extern std::vector<std::vector<int>> new_DT_cannon3;
+extern std::vector<std::vector<int>> DT_cannon1;
+extern std::vector<std::vector<int>> DT_cannon2;
+extern std::vector<std::vector<int>> DT_cannon3;
 
 #endif

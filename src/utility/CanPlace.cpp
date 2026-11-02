@@ -95,6 +95,6 @@ std::vector<Position> getPossiblePlacements(Board& board, PieceState& currentPie
             }
         }
     }
-    std::cout << count;
+    std::cout << "Loops Run:" << count << std::endl;
     return possiblePlacements;
 }
