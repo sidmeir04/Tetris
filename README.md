@@ -1,1 +1,2 @@
-One more thing, currently all key binds are grouped together, can you seperate them into gameplay keys (movement, dropping, ect.) and non-gameplay keys. With sperate implementations. Use your best judgement when implementing this change but generally gameplay keys should only be processed when the game is running and have exact timings using the input buffer and non-gameplay should always be monitered and not use the input buffer.
+TODO:
+  1) Make Readme
