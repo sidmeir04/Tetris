@@ -48,5 +48,6 @@ public:
 };
 
 std::vector<Position> getPossiblePlacements(Board& board, PieceState& piece);
+bool possiblePlacement(Board& board, PieceState& currentPiece, Position targetPosition);
 
 #endif

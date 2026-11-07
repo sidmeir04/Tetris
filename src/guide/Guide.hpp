@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+struct Board; // Forward Declaring
+
 struct GuideStep {
     int length;
     std::vector<std::vector<int>> guideBlocks;
@@ -30,26 +32,11 @@ struct Guide {
 
     Guide(std::string name);
     void reset();
-    void placeBlock();
+    void placeBlock(Board* board);
     void undoBlock();
     void clearLines(const std::vector<int>& clearedLines);
     std::vector<std::vector<int>> getGuideBlocks();
+    bool possibleStep(GuideStep* step, Board* board);
 };
-
-// struct Guide {
-//     std::vector<std::vector<int>> guideBlocks;
-//     std::string guideName;
-//     bool active = true;
-
-//     boost::icl::interval_map<int, std::vector<std::vector<int>>> refrenceRanges;
-//     boost::icl::interval_map<int, std::vector<std::vector<int>>> ranges;
-
-//     Guide(std::vector<std::vector<int>> blocks, std::string name);
-
-//     void reset();
-//     void clearLines(const std::vector<int>& clearedLines, int piecesPlaced);
-//     bool removeRowFromGuide(int piecesPlaced, int rowIndex);
-//     std::vector<std::vector<int>> getGuideBlocks(int piecesPlaced);
-// };
 
 #endif

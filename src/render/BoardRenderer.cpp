@@ -6,7 +6,7 @@
 #include <algorithm>
 
 void drawPiece(sf::RenderWindow& window, sf::Sprite& sprite, int piece, int rotation, int x, int y, int tileSize) {
-    std::vector<std::vector<int>> pieceGrid = getPiece({piece, rotation});
+    std::vector<std::vector<int>> pieceGrid = getPiece(Position(piece, rotation, 0, 0));
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             int val = pieceGrid[i][j];

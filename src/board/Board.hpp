@@ -42,6 +42,7 @@ struct Board {
     void resetGame(int w, int h);
     std::vector<int> clearLines();
     bool placePiece(const PieceState& state);
+    bool placePiece();
     void undoPiece();
     void movePiece(PieceState& currentPiece, int movement);
     void updatePiecePosition(PieceState& currentPiece, InputState* input, std::chrono::time_point<std::chrono::high_resolution_clock> time);

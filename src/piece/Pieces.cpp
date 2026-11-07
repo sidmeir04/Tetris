@@ -229,6 +229,10 @@ std::vector<std::vector<std::vector<std::vector<int>>>> pieces = {
 };
 }
 
-std::vector<std::vector<int>> getPiece(PieceState currentPiece) {
+std::vector<std::vector<int>> getPiece(const PieceState& currentPiece) {
     return pieces[currentPiece.piece][currentPiece.rotation];
+}
+
+std::vector<std::vector<int>> getPiece(const Position& position) {
+    return pieces[position.piece][position.rotation];
 }

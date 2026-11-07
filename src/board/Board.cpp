@@ -130,10 +130,14 @@ bool Board::placePiece(const PieceState& state) {
     currentMove.reset();
     currentPiece.reset(getNextPiece(), 0, 3, height + 2, false);
     held = false;
-    guide.placeBlock();
+    guide.placeBlock(this);
     if (!validPosition(currentPiece, -1)) currentPiece.grounded = true;
     if (!validPosition(currentPiece)) return false;
     return true;
+}
+
+bool Board::placePiece() {
+    return this->placePiece(currentPiece);
 }
 
 void Board::undoPiece() {
@@ -160,11 +164,19 @@ void Board::undoPiece() {
             }
         }
     }
-    pieceQueue.push_front(currentPiece.piece);
-    if(held) {
-        held = false;
-        holdPiece(currentPiece);
+    if (held) {
+        if (currentMove.heldPiece == -1) {
+            pieceQueue.push_front(currentPiece.piece);
+            currentPiece.reset(heldPiece, 0, 3, height + 2, false);
+            heldPiece = -1;
+        } else {
+            held = false;
+            holdPiece(currentPiece);
+        }
     }
+    pieceQueue.push_front(currentPiece.piece);
+    
+
     if (!lastMove.held) {
         currentPiece.reset(lastMove.placedPiece.piece, 0, 3, height + 2, false);
     } else if (lastMove.heldPiece == -1) {
