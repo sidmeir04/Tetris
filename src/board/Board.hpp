@@ -27,6 +27,7 @@ struct Board {
     int piecesPlaced = 0;
     bool held = false;
     Guide guide;
+    bool updateGuide = true;
     bool running = true;
 
     const int tileSize = 32;
@@ -42,7 +43,6 @@ struct Board {
     void resetGame(int w, int h);
     std::vector<int> clearLines();
     bool placePiece(const PieceState& state);
-    bool placePiece();
     void undoPiece();
     void movePiece(PieceState& currentPiece, int movement);
     void updatePiecePosition(PieceState& currentPiece, InputState* input, std::chrono::time_point<std::chrono::high_resolution_clock> time);

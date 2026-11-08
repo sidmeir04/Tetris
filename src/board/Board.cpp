@@ -101,7 +101,7 @@ std::vector<int> Board::clearLines() {
         }
     }
 
-    guide.clearLines(linesCleared);
+    if(updateGuide) guide.clearLines(linesCleared);
     currentMove.lineIndexes = linesCleared;
     currentMove.linesCleared = true;
 
@@ -124,20 +124,16 @@ bool Board::placePiece(const PieceState& state) {
             }
         }
     }
-    currentMove.placedPiece = currentPiece;
+    currentMove.placedPiece = state;
     clearLines();
     moveHistory.push(currentMove);
     currentMove.reset();
     currentPiece.reset(getNextPiece(), 0, 3, height + 2, false);
     held = false;
-    guide.placeBlock(this);
+    if(updateGuide) guide.placeBlock(this);
     if (!validPosition(currentPiece, -1)) currentPiece.grounded = true;
     if (!validPosition(currentPiece)) return false;
     return true;
-}
-
-bool Board::placePiece() {
-    return this->placePiece(currentPiece);
 }
 
 void Board::undoPiece() {
@@ -193,7 +189,7 @@ void Board::undoPiece() {
     }
     piecesPlaced--;
     held = false;
-    guide.undoBlock();
+    if (updateGuide) guide.undoBlock();
     currentMove.reset();
     moveHistory.pop();
 }
