@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 #include <deque>
-#include <iostream>
 
 bool possiblePlacement(Board& board, PieceState& currentPiece, Position targetPosition) {
     VisitedTracker visited(board.width, board.height);
@@ -95,7 +94,6 @@ std::vector<Position> getPossiblePlacements(Board& board, PieceState& currentPie
             }
         }
     }
-    std::cout << "Loops Run:" << count << std::endl;
     board.currentPiece = originalPieceState;
     return possiblePlacements;
 }

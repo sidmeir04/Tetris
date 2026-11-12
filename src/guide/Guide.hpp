@@ -22,6 +22,7 @@ struct GuideStep {
 struct Guide {
     std::string guideName;
     bool active = false;
+    bool advanceStep = true;
     GuideStep* initialStep;
     GuideStep* currentStep;
 

@@ -48,7 +48,8 @@ void Guide::clearLines(const std::vector<int>& clearedLines) {
 void Guide::placeBlock(Board* board) {
     totalPlaced++;
     placedThisStep++;
-    if(placedThisStep >= currentStep->length) {
+    if(placedThisStep >= currentStep->length && advanceStep) {
+        std::cout << "Changing guide" << std::endl;
         placedThisStep = 0;
         if (currentStep == &end) return;
         if (currentStep->nextSteps[0] == &end || currentStep->nextSteps.empty() || currentStep->nextSteps[0] == nullptr) {
@@ -113,10 +114,9 @@ struct Coordinate {
         x(x_pos), y(y_pos) {}
 };
 
-std::vector<Position> getTargetPositions(GuideStep* step, Board* board) {
+std::vector<Position> getTargetPositions(const std::vector<std::vector<int>>& guideBlocks, Board* board) {
     std::vector<Position> targetPositions;
     int targetPiece = board->currentPiece.piece;
-    const std::vector<std::vector<int>>& guideBlocks = board->guide.getGuideBlocks();
     std::vector<Position> possiblePlacements = getPossiblePlacements(*board, board->currentPiece);
 
     if (guideBlocks.empty() || guideBlocks[0].empty()) {
@@ -126,23 +126,34 @@ std::vector<Position> getTargetPositions(GuideStep* step, Board* board) {
     int guideHeight = guideBlocks.size();
     int guideWidth = guideBlocks[0].size();
 
-    for (Position pos : possiblePlacements) {
+    int pieceBlock;
+    for (const Position& pos : possiblePlacements) {
+        // Square rotations have identical occupied positions.
+        if (targetPiece == 1 && pos.rotation != 0) {
+            continue;
+        }
+
         std::vector<std::vector<int>> piece = getPiece(Position(targetPiece, pos.rotation, 0, 0));
         std::vector<Coordinate> toCheck;
 
         for (size_t i = 0; i < piece.size(); i++) {
             for (size_t j = 0; j < piece[i].size(); j++) {
-                if (piece[i][j] == targetPiece) {
+                if (piece[i][j] !=  0) {
                     toCheck.emplace_back(j, i);
                 }
             }
         }
 
         bool possible = true;
-        for (const Coordinate& pos : toCheck) {
-            int gy = pos.y - pos.y;
-            int gx = pos.x + pos.x;
-            if (gy < 0 || gy >= guideHeight || gx < 0 || gx >= guideWidth || guideBlocks[gy][gx] != targetPiece) {
+        for (const Coordinate& c : toCheck) {
+            int gy = pos.y - c.y;
+            int gx = pos.x + c.x;
+            if (gy < 0 || gy >= guideHeight || gx < 0 || gx >= guideWidth) {
+                possible = false;
+                break;
+            }
+            pieceBlock = piece[c.y][c.x];
+            if (guideBlocks[gy][gx] != pieceBlock) {
                 possible = false;
                 break;
             }
@@ -152,106 +163,134 @@ std::vector<Position> getTargetPositions(GuideStep* step, Board* board) {
         }
     }
 
-    // for (int r = 0; r < 4; r++) {
-    //     std::vector<std::vector<int>> piece = getPiece(Position(targetPiece, r, 0, 0));
-    //     std::vector<Coordinate> toCheck;
-
-    //     for (size_t i = 0; i < piece.size(); i++) {
-    //         for (size_t j = 0; j < piece[i].size(); j++) {
-    //             if (piece[i][j] == targetPiece) {
-    //                 toCheck.emplace_back(j, i);
-    //             }
-    //         }
-    //     }
-
-    //     for (int y = 0; y < board->height + 5; y++) {
-    //         for (int x = -3; x < board->width; x++) {
-    //             bool possible = true;
-    //             for (const Coordinate& pos : toCheck) {
-    //                 int gy = y - pos.y;
-    //                 int gx = x + pos.x;
-    //                 if (gy < 0 || gy >= guideHeight || gx < 0 || gx >= guideWidth || guideBlocks[gy][gx] != targetPiece) {
-    //                     possible = false;
-    //                     break;
-    //                 }
-    //             }
-    //             if (possible) {
-    //                 targetPositions.push_back({targetPiece, r, x, y});
-    //             }
-    //         }
-    //     }
+    // for (const Position& pos : targetPositions) {
+    //     std::cout << "Target position: " << pieceBlock << " " << pos.x << " " << pos.y << " " << pos.rotation << std::endl;
     // }
-    for(Position pos : targetPositions) {
-        std::cout << "Target position: " << pos.piece << " " << pos.x << " " << pos.y << " " << pos.rotation << std::endl;
-    }
     return targetPositions;
+}
+
+std::vector<Position> getHoldTargetPositions(const std::vector<std::vector<int>>& guideBlocks, Board* board) {
+    if (board->held) {
+        return {};
+    }
+
+    PieceState originalCurrentPiece = board->currentPiece;
+    int originalHeldPiece = board->heldPiece;
+    std::deque<int> originalQueue = board->pieceQueue;
+    BoardSnapShot originalMove = board->currentMove;
+    bool originalHeld = board->held;
+
+    board->holdPiece(board->currentPiece);
+    std::vector<Position> targets = getTargetPositions(guideBlocks, board);
+
+    board->currentPiece = originalCurrentPiece;
+    board->heldPiece = originalHeldPiece;
+    board->pieceQueue = originalQueue;
+    board->currentMove = originalMove;
+    board->held = originalHeld;
+    return targets;
+}
+
+std::vector<std::vector<int>> getGuideBlocksAfterPlacement(
+    const std::vector<std::vector<int>>& guideBlocks, Board* board) {
+    std::vector<std::vector<int>> updatedGuideBlocks = guideBlocks;
+    const std::vector<int>& clearedLines = board->moveHistory.top().lineIndexes;
+    for (int line : clearedLines) {
+        if (line >= 0 && static_cast<size_t>(line) < updatedGuideBlocks.size()) {
+            updatedGuideBlocks.erase(updatedGuideBlocks.begin() + line);
+        }
+    }
+    return updatedGuideBlocks;
 }
 
 struct SearchStep {
     int depth;
-    std::vector<Position> targetPositions;
-    std::vector<Position> possiblePlacements;
-
+    bool held = false;
     SearchStep* previousStep;
     std::unique_ptr<SearchStep> nextStep;
+    std::vector<std::vector<int>> guideBlocks;
+    std::vector<Position> targetPositions;
+    std::vector<Position> holdTargetPositions;
 
-    SearchStep(int d, SearchStep* previous, std::vector<Position> targets, std::vector<Position> placements)
-        : depth(d), previousStep(previous), 
+    SearchStep(int d, SearchStep* previous, std::vector<std::vector<int>> blocks,
+               std::vector<Position> targets, std::vector<Position> holdTargets)
+        : depth(d), previousStep(previous), nextStep(nullptr),
+          guideBlocks(std::move(blocks)),
           targetPositions(std::move(targets)), 
-          possiblePlacements(std::move(placements)), 
-          nextStep(nullptr) {}
+          holdTargetPositions(std::move(holdTargets)) {}
 };
 
 bool Guide::possibleStep(GuideStep* step, Board* board) {
-    board->updateGuide = false;
-    std::vector<Position> targetPositions = getTargetPositions(step, board);
-    std::vector<Position> possiblePlacements = getPossiblePlacements(*board, board->currentPiece);
-    std::unique_ptr<SearchStep> initialStep = std::make_unique<SearchStep>(0, nullptr, std::move(targetPositions), std::move(possiblePlacements));
+    // board->updateGuide = false;
+    this->advanceStep = false;
+    std::vector<std::vector<int>> guideBlocks = step->guideBlocks;
+    std::vector<Position> targetPositions = getTargetPositions(guideBlocks, board);
+    std::vector<Position> holdTargetPositions = getHoldTargetPositions(guideBlocks, board);
+
+    std::unique_ptr<SearchStep> initialStep = std::make_unique<SearchStep>(
+        0, nullptr, std::move(guideBlocks), std::move(targetPositions), std::move(holdTargetPositions)
+    );
     SearchStep* currentStep = initialStep.get();
-    while(currentStep->previousStep != nullptr || !currentStep->targetPositions.empty()) {
-        // std::cout << "Stepping" << std::endl;
+    while(currentStep->previousStep != nullptr || !currentStep->targetPositions.empty() ||
+          !currentStep->holdTargetPositions.empty()) {
         if (currentStep->depth == step->length) {
-            std::cout << "Return true" << std::endl;
-            board->updateGuide = true;
+            std::cout << "Returning true" << std::endl;
+            for(int i = 0; i < currentStep->depth; i++) board->undoPiece(); // Undo all the placements
+            // board->updateGuide = true;
+            this->advanceStep = true;
             return true;
         }
-        if (currentStep->targetPositions.empty()) {
+        if (currentStep->targetPositions.empty() && currentStep->holdTargetPositions.empty()) {
             if (currentStep->previousStep != nullptr) {
-                std::cout << "Empty "<< std::endl;
                 board->undoPiece();
                 currentStep = currentStep->previousStep;
                 currentStep->nextStep.reset();
                 continue;
             } else {
-                std::cout << "Breaking"<< std::endl;
                 break;
             }
         }
-        Position target = currentStep->targetPositions.back();
-        currentStep->targetPositions.pop_back();
-        bool found = false;
-        for (Position pos : currentStep->possiblePlacements) {
-            if (target == pos) {
-                found = true;
-                break;
-            }
-        }
-        if (found) {
+        if (!currentStep->targetPositions.empty()) {
+            Position target = currentStep->targetPositions.back();
+            currentStep->targetPositions.pop_back();
+
             board->currentPiece.updatePosition(target);
-            std::cout << "Placing: " << target.x << "," << target.y << "," << board->currentPiece.x << "," << board->currentPiece.y << std::endl;
+            // std::cout << "Placing: " << target.x << "," << target.y << std::endl;
             board->placePiece(board->currentPiece);
+            std::vector<std::vector<int>> nextGuideBlocks =
+                getGuideBlocksAfterPlacement(currentStep->guideBlocks, board);
             std::unique_ptr<SearchStep> next = std::make_unique<SearchStep>(
                 currentStep->depth + 1,
                 currentStep,
-                getTargetPositions(step, board),
-                getPossiblePlacements(*board, board->currentPiece)
+                nextGuideBlocks,
+                getTargetPositions(nextGuideBlocks, board),
+                getHoldTargetPositions(nextGuideBlocks, board)
             );
             currentStep->nextStep = std::move(next);
             currentStep = currentStep->nextStep.get();
-            continue;
+        } else if (!currentStep->holdTargetPositions.empty()) {
+            Position target = currentStep->holdTargetPositions.back();
+            currentStep->holdTargetPositions.pop_back();
+
+            board->holdPiece(board->currentPiece);
+            board->currentPiece.updatePosition(target);
+            // std::cout << "Holding and placing: " << target.x << "," << target.y << std::endl;
+            board->placePiece(board->currentPiece);
+            std::vector<std::vector<int>> nextGuideBlocks =
+                getGuideBlocksAfterPlacement(currentStep->guideBlocks, board);
+            std::unique_ptr<SearchStep> next = std::make_unique<SearchStep>(
+                currentStep->depth + 1,
+                currentStep,
+                nextGuideBlocks,
+                getTargetPositions(nextGuideBlocks, board),
+                getHoldTargetPositions(nextGuideBlocks, board)
+            );
+            currentStep->nextStep = std::move(next);
+            currentStep = currentStep->nextStep.get();
         }
     }
-    std::cout << "Return false" << std::endl;
-    board->updateGuide = true;
+    std::cout << "Returning false" << std::endl;
+    // board->updateGuide = true;
+    this->advanceStep = true;
     return false;
 }
