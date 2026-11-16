@@ -45,8 +45,10 @@ struct Board {
     bool placePiece(const PieceState& state);
     void undoPiece();
     void movePiece(PieceState& currentPiece, int movement);
+    bool fastMovePiece(PieceState& currentPiece, int movement);
     void updatePiecePosition(PieceState& currentPiece, InputState* input, std::chrono::time_point<std::chrono::high_resolution_clock> time);
     void rotatePiece(PieceState& currentPiece, int rotation);
+    bool fastRotatePiece(PieceState& currentPiece, int rotation);
     void holdPiece(PieceState& currentPiece);
     std::vector<std::vector<int>> getGuideBlock();
 };

@@ -58,6 +58,7 @@ public:
 
     std::vector<float> frameTimes;
     float fps = 0.f;
+    float maxFrameTime = 0.f;
 
     explicit Game(sf::Texture loadedTexture);
 

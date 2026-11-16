@@ -33,7 +33,7 @@ int Board::generateNextPiece() {
 }
 
 int Board::getNextPiece() {
-    if (pieceQueue.size() < 6) {
+    while (pieceQueue.size() < 6) {
         pieceQueue.push_back(generateNextPiece());
     }
 
@@ -44,17 +44,13 @@ int Board::getNextPiece() {
 }
 
 bool Board::validPosition(const PieceState& state, int yOffset) {
-    std::vector<std::vector<int>> piece = getPiece(state);
+    const std::vector<Coordinate>& offsets = getPieceOffsets(state);
     int x;
     int gridRow;
-    for (int i = 0; i < piece.size(); i++) {
-        for (int j = 0; j < piece[0].size(); j++) {
-            if (piece[i][j]) {
-                x = state.x + j;
-                gridRow = state.y - i + yOffset;
-                if ((x < 0) || (x >= width) || (gridRow < 0) || grid[gridRow][x]) return false;
-            }
-        }
+    for(Coordinate offset : offsets) {
+        x = state.x + offset.x;
+        gridRow = state.y - offset.y + yOffset;
+        if ((x < 0) || (x >= width) || (gridRow < 0) || grid[gridRow][x]) return false;
     }
     return true;
 }
@@ -197,12 +193,18 @@ void Board::undoPiece() {
 void Board::movePiece(PieceState& currentPiece, int movement) {
     int sign = (movement > 0) - (movement < 0);
     for (int i = 0; i < sign * movement; i++) {
-        currentPiece.x += sign;
-        if (!validPosition(currentPiece)) {
-            currentPiece.x -= sign;
-        }
+        if(!fastMovePiece(currentPiece, sign)) break;
     }
     if (validPosition(currentPiece, -1)) currentPiece.grounded = false;
+}
+
+bool Board::fastMovePiece(PieceState& currentPiece, int sign) {
+    currentPiece.x += sign;
+    if (!validPosition(currentPiece)) {
+        currentPiece.x -= sign;
+        return false;
+    }
+    return true;
 }
 
 void Board::updatePiecePosition(PieceState& currentPiece, InputState* input, std::chrono::time_point<std::chrono::high_resolution_clock> time) {
@@ -225,16 +227,34 @@ void Board::updatePiecePosition(PieceState& currentPiece, InputState* input, std
 void Board::rotatePiece(PieceState& currentPiece, int rotation) {
     PieceState rotated = currentPiece;
     rotated.rotation = (rotated.rotation + rotation + 4) % 4;
-    std::vector<std::vector<int>> kicks = getOffsets(rotated, currentPiece.rotation);
-    for (std::vector<int> offset : kicks) {
+    const std::vector<std::vector<int>>& kicks = getOffsets(rotated, currentPiece.rotation);
+    for (const std::vector<int>& offset : kicks) {
         PieceState temp = rotated;
         temp.x += offset[0];
         temp.y -= offset[1];
         if (validPosition(temp)) {
             currentPiece = temp;
+            if (validPosition(currentPiece, -1)) currentPiece.grounded = false;
             return;
         }
     }
+}
+
+bool Board::fastRotatePiece(PieceState& currentPiece, int rotation) {
+    PieceState rotated = currentPiece;
+    rotated.rotation = (rotated.rotation + rotation + 4) % 4;
+    const std::vector<std::vector<int>>& kicks = getOffsets(rotated, currentPiece.rotation);
+    for (const std::vector<int>& offset : kicks) {
+        rotated.x += offset[0];
+        rotated.y -= offset[1];
+        if (validPosition(rotated)) {
+            currentPiece = rotated;
+            return true;
+        }
+        rotated.x -= offset[0];
+        rotated.y += offset[1];
+    }
+    return false;
 }
 
 void Board::holdPiece(PieceState& currentPiece) {

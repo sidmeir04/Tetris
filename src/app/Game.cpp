@@ -273,6 +273,7 @@ void Game::applySettings(sf::RenderWindow& window) {
 }
 
 void Game::recordFrameTime(float frameLength) {
+    if (1.0f/frameLength > maxFrameTime) maxFrameTime = 1.0f/frameLength;
     frameTimes.push_back(frameLength);
     if (frameTimes.size() > 30) {
         float totalFps = 0.f;
@@ -287,6 +288,7 @@ void Game::recordFrameTime(float frameLength) {
 void Game::draw(sf::RenderWindow& window) {
     if (showDebug) {
         std::string status = "FPS: " + std::to_string(static_cast<int>(fps)) +
+                             ", Max Frametime: " + std::to_string(static_cast<int>(1000*maxFrameTime)) + 
                              " | Piece X: " + std::to_string(board.currentPiece.x) +
                              ", Piece Y: " + std::to_string(board.currentPiece.y) +
                              ", Max Time Grounded: " + std::to_string(falling.maxTimeGrounded);

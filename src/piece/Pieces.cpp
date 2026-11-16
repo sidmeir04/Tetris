@@ -230,9 +230,32 @@ std::vector<std::vector<std::vector<std::vector<int>>>> pieces = {
         }
     }
 };
+
+const std::vector<std::vector<Coordinate>>& getPieceOffsetsTable() {
+    static const std::vector<std::vector<Coordinate>> pieceOffsets = [] {
+        std::vector<std::vector<Coordinate>> offsets(pieces.size() * 4);
+        for (size_t pieceIndex = 0; pieceIndex < pieces.size(); ++pieceIndex) {
+            for (size_t rotation = 0; rotation < pieces[pieceIndex].size(); ++rotation) {
+                std::vector<Coordinate>& pieceOffsets = offsets[4 * pieceIndex + rotation];
+                const std::vector<std::vector<int>>& shape = pieces[pieceIndex][rotation];
+                for (size_t y = 0; y < shape.size(); ++y) {
+                    for (size_t x = 0; x < shape[y].size(); ++x) {
+                        if (shape[y][x] != 0) {
+                            pieceOffsets.emplace_back(static_cast<int>(x), static_cast<int>(y));
+                        }
+                    }
+                }
+            }
+        }
+        return offsets;
+    }();
+    return pieceOffsets;
+}
 }
 
-std::vector<std::vector<int>> getPiece(const Position& position) {
+
+
+const std::vector<std::vector<int>>& getPiece(const Position& position) {
     if (position.piece < 0 || position.piece >= static_cast<int>(pieces.size())) {
         throw std::out_of_range("Invalid piece index: " + std::to_string(position.piece));
     }
@@ -242,7 +265,7 @@ std::vector<std::vector<int>> getPiece(const Position& position) {
     return pieces[position.piece][position.rotation];
 }
 
-std::vector<std::vector<int>> getPiece(const PieceState& currentPiece) {
+const std::vector<std::vector<int>>& getPiece(const PieceState& currentPiece) {
     if (currentPiece.piece < 0 || currentPiece.piece >= static_cast<int>(pieces.size())) {
         throw std::out_of_range("Invalid piece index: " + std::to_string(currentPiece.piece));
     }
@@ -251,4 +274,26 @@ std::vector<std::vector<int>> getPiece(const PieceState& currentPiece) {
     }
     return pieces[currentPiece.piece][currentPiece.rotation];
     // return getPiece(currentPiece.getPosition());
+}
+
+const std::vector<Coordinate>& getPieceOffsets(const Position& position) {
+    // if (position.piece < 0 || position.piece >= static_cast<int>(pieces.size())) {
+    //     throw std::out_of_range("Invalid piece index: " + std::to_string(position.piece));
+    // }
+    // if (position.rotation < 0 ||
+    //     position.rotation >= static_cast<int>(pieces[position.piece].size())) {
+    //     throw std::out_of_range("Invalid piece rotation: " + std::to_string(position.rotation));
+    // }
+    return getPieceOffsetsTable()[4 * position.piece + position.rotation];
+}
+
+const std::vector<Coordinate>& getPieceOffsets(const PieceState& currentPiece) {
+    // if (currentPiece.piece < 0 || currentPiece.piece >= static_cast<int>(pieces.size())) {
+    //     throw std::out_of_range("Invalid piece index: " + std::to_string(currentPiece.piece));
+    // }
+    // if (currentPiece.rotation < 0 ||
+    //     currentPiece.rotation >= static_cast<int>(pieces[currentPiece.piece].size())) {
+    //     throw std::out_of_range("Invalid piece rotation: " + std::to_string(currentPiece.rotation));
+    // }
+    return getPieceOffsetsTable()[4 * currentPiece.piece + currentPiece.rotation];
 }

@@ -36,7 +36,7 @@ int getRotationIndex(int prevRotation, int nextRotation) {
     return 0;
 }
 
-std::vector<std::vector<int>> getOffsets(PieceState currentPiece, int lastRotation) {
+const std::vector<std::vector<int>>& getOffsets(PieceState currentPiece, int lastRotation) {
     if (currentPiece.piece == 0) {
         return I_KICKS[getRotationIndex(lastRotation, currentPiece.rotation)];
     }

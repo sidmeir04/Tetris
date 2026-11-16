@@ -11,16 +11,14 @@
 class VisitedTracker {
     int width;
     int height;
-    // Flat 4D storage mapped to 1D: [piece][rotation][x_shifted][y]
     std::vector<bool> visited;
 
     int getIndex(const Position& p) const {
-        int x_shifted = p.x + 3; // Shift range from [-3, width] to [0, width + 3]
+        int x_shifted = p.x + 3;
         int x_range = width + 4;
         int y_range = height + 6;
         int rot_range = 4;
 
-        // Flattening formula
         return p.piece * (rot_range * x_range * y_range) +
                p.rotation * (x_range * y_range) +
                x_shifted * y_range +
@@ -48,6 +46,7 @@ public:
 };
 
 std::vector<Position> getPossiblePlacements(Board& board, PieceState& piece);
+std::vector<Position> getTargetPositions(const std::vector<std::vector<int>>& guideBlocks, Board* board);
 bool possiblePlacement(Board& board, PieceState& currentPiece, Position targetPosition);
 
 #endif

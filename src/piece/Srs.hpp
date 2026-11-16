@@ -5,6 +5,6 @@
 #include <vector>
 
 int getRotationIndex(int prevRotation, int nextRotation);
-std::vector<std::vector<int>> getOffsets(PieceState currentPiece, int lastRotation);
+const std::vector<std::vector<int>>& getOffsets(PieceState currentPiece, int lastRotation);
 
 #endif
