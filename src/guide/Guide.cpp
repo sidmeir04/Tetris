@@ -15,16 +15,31 @@ GuideStep::GuideStep(int len, GuideStep* previous, std::vector<std::vector<int>>
         clearedTimeStamps = {};
     }
 
+void GuideStep::reset() {
+    clearedLines.clear();
+    clearedTimeStamps.clear();
+}
+
+void GuideStep::addNextSteps(std::vector<GuideStep*> steps) {
+    for (GuideStep* step : steps) {
+        nextSteps.push_back(step);
+    }
+}
+
 Guide::Guide(std::string name)
     : guideName(name) {
     end.nextSteps.push_back(&end);
     GuideStep* step1 = new GuideStep(7, nullptr, DT_cannon1);
     GuideStep* step2 = new GuideStep(7, step1, DT_cannon2);
     GuideStep* step3 = new GuideStep(7, step2, DT_cannon3);
+    GuideStep* step4a = new GuideStep(7, step3, Kaidan_route_1a);
+    GuideStep* step4b = new GuideStep(7, step3, Kaidan_route_1b);
+    GuideStep* step4c = new GuideStep(7, step3, Anchor_set_route_1);
+    GuideStep* step4e = new GuideStep(7, step3, Anchor_set_route_3);
 
-    step1->nextSteps.push_back(step2);
-    step2->nextSteps.push_back(step3);
-    step3->nextSteps.push_back(&end);
+    step1->addNextSteps({step2});
+    step2->addNextSteps({step3});
+    step3->addNextSteps({step4a, step4b, step4c, step4e});
 
     currentStep = step1;
     initialStep = step1;
@@ -32,7 +47,7 @@ Guide::Guide(std::string name)
 
 void Guide::reset() {
     while(currentStep->previousStep!=nullptr) {
-        currentStep->clearedLines.clear();
+        currentStep->reset();
         currentStep = currentStep->previousStep;
     }
     totalPlaced = 0;
@@ -53,7 +68,7 @@ void Guide::placeBlock(Board* board) {
         std::cout << "Changing guide" << std::endl;
         placedThisStep = 0;
         if (currentStep == &end) return;
-        if (currentStep->nextSteps[0] == &end || currentStep->nextSteps.empty() || currentStep->nextSteps[0] == nullptr) {
+        if (currentStep->nextSteps.empty() || currentStep->nextSteps[0] == &end || currentStep->nextSteps[0] == nullptr) {
             end.previousStep = currentStep;
             currentStep = &end;
             return;
@@ -66,7 +81,8 @@ void Guide::placeBlock(Board* board) {
             }
         }
         std::cout << "None Found :<" << std::endl;
-        currentStep = currentStep->nextSteps[0]; // Default to the first step if non are possible
+        end.previousStep = currentStep;
+        currentStep = &end; // Go to end step if none are possible
     }
 }
 
@@ -82,8 +98,7 @@ void Guide::undoBlock() {
             placedThisStep = 0;
         }
     }
-    while (!currentStep->clearedTimeStamps.empty() && 
-            currentStep->clearedTimeStamps.back() == placedThisStep) {
+    while (!currentStep->clearedTimeStamps.empty() && currentStep->clearedTimeStamps.back() == placedThisStep) {
         currentStep->clearedTimeStamps.pop_back();
         currentStep->clearedLines.pop_back();
     }
@@ -115,6 +130,7 @@ std::vector<Position> getHoldTargetPositions(const std::vector<std::vector<int>>
     PieceState originalCurrentPiece = board->currentPiece;
     int originalHeldPiece = board->heldPiece;
     std::deque<int> originalQueue = board->pieceQueue;
+    std::vector<int> originalBag = board->pieceBag;
     BoardSnapShot originalMove = board->currentMove;
     bool originalHeld = board->held;
 
@@ -124,6 +140,7 @@ std::vector<Position> getHoldTargetPositions(const std::vector<std::vector<int>>
     board->currentPiece = originalCurrentPiece;
     board->heldPiece = originalHeldPiece;
     board->pieceQueue = originalQueue;
+    board->pieceBag = originalBag;
     board->currentMove = originalMove;
     board->held = originalHeld;
     return targets;
@@ -160,6 +177,31 @@ struct SearchStep {
 bool Guide::possibleStep(GuideStep* step, Board* board) {
     Timer timer = Timer();
 
+    std::vector<std::vector<int>> originalGrid = board->grid;
+    std::stack<BoardSnapShot> originalMoveHistory = board->moveHistory;
+    BoardSnapShot originalMove = board->currentMove;
+    PieceState originalCurrentPiece = board->currentPiece;
+    std::deque<int> originalQueue = board->pieceQueue;
+    std::vector<int> originalBag = board->pieceBag;
+    int originalHeldPiece = board->heldPiece;
+    bool originalHeld = board->held;
+    int originalPiecesPlaced = board->piecesPlaced;
+    bool originalUpdateGuide = board->updateGuide;
+    board->updateGuide = false;
+
+    auto restoreBoardState = [&]() {
+        board->grid = originalGrid;
+        board->moveHistory = originalMoveHistory;
+        board->currentMove = originalMove;
+        board->currentPiece = originalCurrentPiece;
+        board->pieceQueue = originalQueue;
+        board->pieceBag = originalBag;
+        board->heldPiece = originalHeldPiece;
+        board->held = originalHeld;
+        board->piecesPlaced = originalPiecesPlaced;
+        board->updateGuide = originalUpdateGuide;
+    };
+
     this->advanceStep = false;
     std::vector<std::vector<int>> guideBlocks = step->guideBlocks;
     std::vector<Position> targetPositions = getTargetPositions(guideBlocks, board);
@@ -174,6 +216,7 @@ bool Guide::possibleStep(GuideStep* step, Board* board) {
             std::cout << "Returning true" << std::endl;
             for(int i = 0; i < currentStep->depth; i++) board->undoPiece(); // Undo all the placements
             this->advanceStep = true;
+            restoreBoardState();
             timer.printTotalElapsedTime();
             return true;
         }
@@ -231,6 +274,7 @@ bool Guide::possibleStep(GuideStep* step, Board* board) {
     }
     std::cout << "Returning false" << std::endl;
     this->advanceStep = true;
+    restoreBoardState();
     timer.printTotalElapsedTime();
     return false;
 }

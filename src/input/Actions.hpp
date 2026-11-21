@@ -23,6 +23,7 @@ enum class NonGameplayAction {
     ExitGame,
     ToggleGuide,
     PauseGame,
+    PrintBoard,
     Count
 };
 

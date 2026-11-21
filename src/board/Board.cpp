@@ -105,6 +105,16 @@ std::vector<int> Board::clearLines() {
 }
 
 bool Board::placePiece(const PieceState& state) {
+    if (!currentMove.capturedState) {
+        currentMove.capturedState = true;
+        currentMove.currentPieceBefore.reset(state.piece, 0, 3, height + 2, false);
+        currentMove.pieceQueueBefore = pieceQueue;
+        currentMove.pieceBagBefore = pieceBag;
+        currentMove.heldPieceBefore = heldPiece;
+        currentMove.heldBefore = held;
+        currentMove.piecesPlacedBefore = piecesPlaced;
+    }
+
     piecesPlaced++;
     std::vector<std::vector<int>> piece = getPiece(state);
     int x;
@@ -156,35 +166,17 @@ void Board::undoPiece() {
             }
         }
     }
-    if (held) {
-        if (currentMove.heldPiece == -1) {
-            pieceQueue.push_front(currentPiece.piece);
-            currentPiece.reset(heldPiece, 0, 3, height + 2, false);
-            heldPiece = -1;
-        } else {
-            held = false;
-            holdPiece(currentPiece);
-        }
-    }
-    pieceQueue.push_front(currentPiece.piece);
-    
-
-    if (!lastMove.held) {
-        currentPiece.reset(lastMove.placedPiece.piece, 0, 3, height + 2, false);
-    } else if (lastMove.heldPiece == -1) {
-        pieceQueue.push_front(heldPiece);
-        heldPiece = -1;
-        currentPiece.reset(lastMove.placedPiece.piece, 0, 3, height + 2, false);
-        int temp = currentPiece.piece;
-        currentPiece.piece = pieceQueue.front();
-        pieceQueue.pop_front();
-        pieceQueue.push_front(temp);
+    if (lastMove.capturedState) {
+        currentPiece = lastMove.currentPieceBefore;
+        pieceQueue = lastMove.pieceQueueBefore;
+        pieceBag = lastMove.pieceBagBefore;
+        heldPiece = lastMove.heldPieceBefore;
+        held = lastMove.heldBefore;
+        piecesPlaced = lastMove.piecesPlacedBefore;
     } else {
-        heldPiece = lastMove.placedPiece.piece;
-        currentPiece.reset(lastMove.heldPiece, 0, 3, height + 2, false);
+        piecesPlaced--;
+        held = false;
     }
-    piecesPlaced--;
-    held = false;
     if (updateGuide) guide.undoBlock();
     currentMove.reset();
     moveHistory.pop();
@@ -259,6 +251,16 @@ bool Board::fastRotatePiece(PieceState& currentPiece, int rotation) {
 
 void Board::holdPiece(PieceState& currentPiece) {
     if (held) return;
+
+    if (!currentMove.capturedState) {
+        currentMove.capturedState = true;
+        currentMove.currentPieceBefore = this->currentPiece;
+        currentMove.pieceQueueBefore = pieceQueue;
+        currentMove.pieceBagBefore = pieceBag;
+        currentMove.heldPieceBefore = heldPiece;
+        currentMove.heldBefore = held;
+        currentMove.piecesPlacedBefore = piecesPlaced;
+    }
 
     currentMove.held = true;
     if (heldPiece != -1) {

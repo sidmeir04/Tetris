@@ -29,6 +29,7 @@ struct GameSettings {
         {"Exit Game", VK_ESCAPE, sf::Keyboard::Key::Escape},
         {"Toggle Guide", 'G', sf::Keyboard::Key::G},
         {"Pause Game", 'P', sf::Keyboard::Key::P},
+        {"Print Board", 'X', sf::Keyboard::Key::X},
     };
 
     GameplayAction gameplayActionAt(std::size_t index) const {

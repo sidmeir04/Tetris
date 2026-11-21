@@ -7,6 +7,7 @@
 #include "utility/CanPlace.hpp"
 
 #include <memory>
+#include <iostream>
 
 Game::Game(sf::Texture loadedTexture)
     : board(10, 20),
@@ -201,6 +202,15 @@ void Game::handleNonGameplayAction(NonGameplayAction action, sf::RenderWindow& w
             }
             break;
         case NonGameplayAction::Count:
+            break;
+        case NonGameplayAction::PrintBoard:
+            for (int i = 0; i < board.grid.size(); i++) {
+                for (int j = 0; j < board.grid[i].size() - 1; j++) {
+                    std::cout << board.grid[i][j] << ", ";
+                }
+                std::cout << board.grid[i][board.grid[i].size() - 1];
+                std::cout << std::endl;
+            }
             break;
     }
 }

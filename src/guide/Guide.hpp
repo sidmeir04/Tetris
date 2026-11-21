@@ -17,6 +17,8 @@ struct GuideStep {
     std::vector<GuideStep*> nextSteps;
 
     GuideStep(int len, GuideStep* previous, std::vector<std::vector<int>> blocks);
+    void reset();
+    void addNextSteps(std::vector<GuideStep*> steps);
 };
 
 struct Guide {
